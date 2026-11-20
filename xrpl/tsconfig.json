@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "rootDir": ".",
+    "outDir": "dist",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true
+  },
+  "include": ["escrow/**/*.ts", "shared/**/*.ts", "nft/**/*.ts", "agreement/**/*.ts"]
+}
