@@ -1,6 +1,6 @@
 {
   "name": "ixh26-xrpl",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "setup:wallets": "npm run build && node dist/setup-wallets.js",
     "test": "npm run build && node --test dist/*/*.test.js"
   },
   "dependencies": {

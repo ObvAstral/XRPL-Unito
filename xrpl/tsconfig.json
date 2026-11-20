@@ -9,5 +9,11 @@
     "noEmitOnError": true,
     "skipLibCheck": true
   },
-  "include": ["escrow/**/*.ts", "shared/**/*.ts", "nft/**/*.ts", "agreement/**/*.ts"]
+  "include": [
+    "setup-wallets.ts",
+    "escrow/**/*.ts",
+    "shared/**/*.ts",
+    "nft/**/*.ts",
+    "agreement/**/*.ts"
+  ]
 }

@@ -1,27 +1,46 @@
-# XRPL Testnet
+# Modulo Pagamenti, Escrow e Vault 2-su-3 · XRPL Testnet (v2)
 
-Richiede Node.js 22.13 o successivo. Dalla radice del repository:
+Richiede Node.js `>= 22.13.0`. Dalla radice del repository:
 
 ```sh
 npm --prefix xrpl ci
 npm --prefix xrpl test
 ```
 
-Il codice dell’escrow è in `escrow/`, con punto d’ingresso in `escrow/index.ts`. `shared/escrow-order.ts` definisce i termini che il verificatore dell’accordo deve fornire all’escrow. `fundBy` e `deliverBy` sono stringhe UTC ISO 8601 al secondo. L’importo è `"1000000"` drops. Il modulo calcola `FinishAfter` da `deliverBy` e aggiunge 300 secondi per `CancelAfter`.
+## 1. Setup preliminare dei due Vault e verifica Testnet (`setup-wallets.ts`)
 
-| Chi lo usa | Funzione | Dati da fornire |
-| --- | --- | --- |
-| Oracolo | `prepareCondition()` | Salva la preimage nel proprio archivio e consegna all’API la sola condizione pubblica. |
-| Firmatario di Bob | `EscrowService.fund(bundle, verify, wallet, confirm)` | `verify` verifica entrambe le firme e il regolamento, e legge dall’oracolo autenticato l’hash registrato. `confirm` mostra termini e fee e chiede conferma prima della firma. |
-| API | `EscrowLedger.verifyEscrow(order, ledgerHash)` | Fornisce l’hash di `EscrowCreate` associato all’ordine appena disponibile. Usa lo stesso snapshot validato di `verifyPass`. |
-| Oracolo | `EscrowService.finish(order, wallet, loadVerifiedDelivery, confirm)` | Il callback recupera il verdetto positivo persistito, verifica il PNG in custodia e restituisce la preimage associata a ordine, accordo e ID dell’oggetto escrow. |
-| Firmatario di Bob | `EscrowService.recover(order, wallet, confirm)` | Fornisce l’accordo con l’hash del deposito. L’escrow deve risultare ancora aperto oltre il termine di annullamento. |
+Per creare (o verificare e riprendere al riavvio) i wallet di sviluppo, i due vault 2-su-3 prefinanziati su XRPL Testnet e controllare se l’emendamento `NFTokenMintOffer` è attivo:
 
-Usa `connectTestnet()` per aprire la connessione. In caso di failover, `connectTestnet('xrplLabs')` permette di ripetere l’intera verifica su uno snapshot nuovo. Chiudi la connessione con `client.disconnect()` alla fine. Ogni processo che firma usa un `AttemptStore` nella propria directory privata, per esempio sotto `xrpl/.xrpl-local/`. Mantieni lo stesso archivio quando riavvii il processo e chiudilo con `store.close()`.
+```sh
+npm --prefix xrpl run setup:wallets
+```
 
-Le operazioni restituiscono l’hash e lo stato del tentativo. Se è `pending`, interroga `reconcile(hash)`. Passa `true` come secondo argomento quando vuoi ritentare l’invio dello stesso blob. Conserva `createHash` sull’ordine dopo la validazione del deposito e applica il vincolo di unicità sull’ID dell’oggetto escrow nel database degli ordini. Per mostrare incasso o rimborso usa gli stati `paid` e `refunded` di `verifyEscrow`, ricavati dalla transazione validata che ha rimosso l’oggetto. [Invio affidabile su XRPL](https://xrpl.org/docs/concepts/transactions/reliable-transaction-submission)
+- Salva le chiavi private di sviluppo in `xrpl/.xrpl-local/dev-secrets.json` (`0600`, escluso da git).
+- Salva e stampa su `stdout` `xrpl/.xrpl-local/public-config.json` da consegnare a **Persona A** e **Persona C**:
+  - `participants`: indirizzi classici di `alice`, `bob`, `cadAuthority`, `billboardAuthority` e `operator`.
+  - `vaults.cad`: indirizzo del vault CAD con `SignerQuorum: 2`, firmatari `[alice, bob, cadAuthority]` (`SignerWeight: 1`) e `masterDisabled: true` (`asfDisableMaster`).
+  - `vaults.billboard`: indirizzo del vault Cartellone con `SignerQuorum: 2`, firmatari `[alice, bob, billboardAuthority]` (`SignerWeight: 1`) e `masterDisabled: true`.
+  - `capabilities.nftokenMintOfferEnabled`: esito validato sull’oggetto `Amendments` del ledger Testnet.
+- Se alcuni indirizzi sono già stati generati da Persona A, passarli con `--participants <file.json>`. Una seconda esecuzione su vault già pronti non invia nuove transazioni.
 
-Il modulo espone i punti di integrazione per la CLI, il verificatore delle firme, il database degli ordini e l’archivio dell’oracolo. I test locali usano un nodo simulato e wallet generati per le singole prove.
+## 2. Contratti ed API di `xrpl/escrow` per Persona A e Persona C
+
+Punto d’ingresso: `xrpl/escrow/index.ts` (tipi condivisi in `xrpl/shared/escrow-order.ts` e `xrpl/shared/signer.ts`).
+
+- **Riparto importi interi (`splitRentalAmount(grossDrops, feeBps)`):**
+  - Calcola `feeDrops = floor(grossDrops * feeBps / 10000)` e `netDrops = grossDrops - feeDrops` in drops interi (es. `10000000` drops al `1000` bps = `1000000` all’ente + `9000000` netto escrow).
+- **Deposito temporale per ordine (`EscrowService.deposit(order, bobSigner)`):**
+  - Verifica sul ledger che il vault abbia i 3 firmatari attesi e la master key disabilitata, poi invia `EscrowCreate` da `bob` verso `order.vault` con `FinishAfter = endAt`, senza `Condition` e senza `CancelAfter`. Restituisce hash, stato e `escrowObjectId`.
+- **Verifica su snapshot condiviso (`EscrowLedger.verifyEscrowAt(order, snapshot)`):**
+  - Da invocare sullo stesso `ValidatedLedger` usato per `account_nfts`. Distingue `'missing'`, `'pending'`, `'mismatch'`, `'locked'` (affitto finanziato), `'releasable'` ("sbloccabile") e `'credited_to_vault'` ("accreditato al vault"). Solleva `LedgerUnavailable` (`503`) se il nodo non espone uno snapshot validato recente.
+- **Sblocco a maturazione (`EscrowService.releaseToVault(order, createHash, operatorSigner)`):**
+  - Superato `FinishAfter` sul tempo del ledger, invia `EscrowFinish` dall’account operativo e restituisce la ricevuta di accredito sul vault.
+- **Liquidazione multifirma 2-su-3 (`prepareVaultPayout` + `addVaultSignature` oppure `settleVault`):**
+  - Prepara una sola volta `Payment` con `SigningPubKey: ""` e `client.autofill(tx, 2)` (`Fee >= 3x`). Espone `phase: 'awaiting_signatures'` ("in attesa di firma") finché non arrivano due firme valide coerenti con `VaultResolutionMode` (`'ordinary'`, `'arbitration_alice'`, `'arbitration_bob'`, `'inadmissible_refund'`), poi combina i blob con `xrpl.multisign`, registra l’hash prima del `submit`, espone `'awaiting_ledger'` ("in attesa del ledger") e verifica `delivered_amount === netDrops` (es. tutti i 9 XRP al beneficiario).
+- **Rimborso fee per checkout interrotto (`EscrowService.refundFee(order, acceptOfferHash, authoritySigner)`):**
+  - Dopo `checkoutDeadline`, riconcilia prima eventuali depositi `pending`, controlla l’assenza di escrow attivi di Bob, verifica nei metadati validati di `NFTokenAcceptOffer` che la fee sia stata realmente incassata dall’ente e invia al massimo un `Payment` di `feeDrops` a Bob.
+- **Riconciliazione e sblocco riserva vault (`EscrowService.reconcileOrder(orderId)`):**
+  - Riconcilia tutti i tentativi di un ordine in `AttemptStore` (`escrow-attempts.sqlite`) e indica tramite `canReleaseVault` quando il backend SQLite può riassegnare il vault a un nuovo ordine.
 
 ## Affitti v2 · Wallet, accordi e NFT
 

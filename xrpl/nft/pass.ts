@@ -1,19 +1,10 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import type { NFTokenAcceptOffer, NFTokenCreateOffer, NFTokenMint } from 'xrpl'
+import type { NFTokenAcceptOffer, NFTokenBurn, NFTokenCreateOffer, NFTokenMint } from 'xrpl'
 
 export type Fields = Record<string, unknown>
 export type LedgerRequest = (command: string, fields?: Fields) => Promise<Fields>
 export type PassStatus = 'present' | 'absent' | 'unavailable'
-export type NftTransaction = NFTokenMint | NFTokenCreateOffer | NFTokenAcceptOffer
-
-export interface PassOrder {
-  orderId: string
-  aliceAddress: string
-  bobAddress: string
-  nftId: string
-  offerId: string
-  offerExpiresAt: string
-}
+export type NftTransaction = NFTokenMint | NFTokenCreateOffer | NFTokenAcceptOffer | NFTokenBurn
 
 export interface Snapshot {
   hash: string
@@ -22,7 +13,6 @@ export interface Snapshot {
 }
 
 const rippleEpoch = 946_684_800
-const sellFlag = 1
 
 export function record(value: unknown): Fields {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -80,6 +70,15 @@ export async function recentSnapshot(rpc: LedgerRequest): Promise<Snapshot> {
   return snapshot
 }
 
+/** Expiry must still be in the future on both the validated ledger and the local clock. */
+export function checkOfferWindow(expiresAt: string, snapshot: Snapshot): number {
+  const expiry = rippleTime(expiresAt)
+  if (expiry <= snapshot.closeTime || Date.now() / 1000 >= expiry + rippleEpoch) {
+    throw new Error('L’offerta è scaduta.')
+  }
+  return expiry
+}
+
 function assertSnapshot(data: Fields, hash: string) {
   if (readHash(data.ledger_hash) !== hash) {
     throw new Error('La risposta XRPL usa uno snapshot diverso.')
@@ -127,75 +126,14 @@ export async function findOwnedNft(rpc: LedgerRequest, account: string, nftId: s
 /** Bind one node. The caller supplies the validated snapshot also used for escrow. */
 export function createPassVerifier(rpc: LedgerRequest) {
   return async function verifyPass(
-    order: Pick<PassOrder, 'bobAddress' | 'nftId'>,
+    order: { readonly ownerAddress: string; readonly nftId: string },
     ledgerHash: string,
   ): Promise<PassStatus> {
     try {
-      const nft = await findOwnedNft(rpc, order.bobAddress, readHash(order.nftId), readHash(ledgerHash))
+      const nft = await findOwnedNft(rpc, order.ownerAddress, readHash(order.nftId), readHash(ledgerHash))
       return nft ? 'present' : 'absent'
     } catch {
       return 'unavailable'
     }
-  }
-}
-
-export function mintTransaction(alice: string, taxon: number, filterId: string, filterVersion: number): NFTokenMint {
-  readUint32(taxon)
-  if (!['grayscale', 'negative', 'swap-rb'].includes(filterId) || filterVersion !== 1) {
-    throw new Error('Filtro o versione fuori dal catalogo demo.')
-  }
-  return {
-    TransactionType: 'NFTokenMint',
-    Account: alice,
-    NFTokenTaxon: taxon,
-    URI: Buffer.from(`urn:ixh26:filter:${filterId}:${filterVersion}`, 'utf8').toString('hex').toUpperCase(),
-  }
-}
-
-export function offerTransaction(order: Omit<PassOrder, 'offerId'>): NFTokenCreateOffer {
-  return {
-    TransactionType: 'NFTokenCreateOffer',
-    Account: order.aliceAddress,
-    NFTokenID: readHash(order.nftId),
-    Flags: sellFlag,
-    Amount: '0',
-    Destination: order.bobAddress,
-    Expiration: rippleTime(order.offerExpiresAt),
-  }
-}
-
-export function acceptTransaction(order: PassOrder): NFTokenAcceptOffer {
-  return {
-    TransactionType: 'NFTokenAcceptOffer',
-    Account: order.bobAddress,
-    NFTokenSellOffer: readHash(order.offerId),
-  }
-}
-
-export function checkOfferWindow(expiresAt: string, snapshot: Snapshot): number {
-  const expiry = rippleTime(expiresAt)
-  if (expiry <= snapshot.closeTime || Date.now() / 1000 >= expiry + rippleEpoch) {
-    throw new Error('L’offerta è scaduta.')
-  }
-  return expiry
-}
-
-export async function checkOffer(rpc: LedgerRequest, order: PassOrder, snapshot: Snapshot): Promise<void> {
-  const offerId = readHash(order.offerId)
-  const nftId = readHash(order.nftId)
-  const expiry = checkOfferWindow(order.offerExpiresAt, snapshot)
-  const result = await readAtSnapshot(rpc, 'ledger_entry', { nft_offer: offerId, binary: false }, snapshot.hash)
-  const offer = record(result.node)
-  if (
-    readHash(result.index ?? offer.index) !== offerId || offer.LedgerEntryType !== 'NFTokenOffer' ||
-    (readUint32(offer.Flags) & sellFlag) === 0 || offer.Owner !== order.aliceAddress ||
-    readHash(offer.NFTokenID) !== nftId || offer.Destination !== order.bobAddress ||
-    offer.Amount !== '0' || offer.Expiration !== expiry
-  ) {
-    throw new Error('L’offerta XRPL non corrisponde ai termini dell’ordine.')
-  }
-  const nft = await findOwnedNft(rpc, order.aliceAddress, nftId, snapshot.hash)
-  if (nft?.Issuer !== order.aliceAddress) {
-    throw new Error('Alice deve possedere il pass ed esserne l’emittente.')
   }
 }
