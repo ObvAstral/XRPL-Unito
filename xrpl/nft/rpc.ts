@@ -1,10 +1,6 @@
+import { normalizeTestnetNode, testnetHttpUrl } from '../shared/testnet-node.js'
 import { record } from './pass.js'
 import type { LedgerRequest } from './pass.js'
-
-const urls = new Map([
-  ['ripple', 'https://s.altnet.rippletest.net:51234/'],
-  ['xrpl-labs', 'https://testnet.xrpl-labs.com/'],
-])
 
 export class RpcError extends Error {
   code: string
@@ -17,9 +13,8 @@ export class RpcError extends Error {
   }
 }
 
-export async function connectTestnet(nodeName = 'ripple'): Promise<LedgerRequest> {
-  const url = urls.get(nodeName)
-  if (!url) throw new Error('XRPL_TESTNET_NODE deve essere ripple o xrpl-labs.')
+export async function connectTestnet(nodeName?: string): Promise<LedgerRequest> {
+  const url = testnetHttpUrl(normalizeTestnetNode(nodeName))
   const rpc: LedgerRequest = async (method, fields = {}) => {
     const response = await fetch(url, {
       method: 'POST',

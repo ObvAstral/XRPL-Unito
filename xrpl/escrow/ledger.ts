@@ -29,6 +29,7 @@ import type {
   RentalDepositOrder,
   RentalPaymentOrder,
 } from '../shared/escrow-order.js'
+import { normalizeTestnetNode, testnetWsUrl } from '../shared/testnet-node.js'
 import {
   AMENDMENTS_LEDGER_ENTRY_ID,
   LSF_DISABLE_MASTER,
@@ -41,11 +42,6 @@ import {
   normalizeHash,
   validateRentalOrder,
 } from './protocol.js'
-
-const TESTNET = {
-  ripple: 'wss://s.altnet.rippletest.net:51233',
-  xrplLabs: 'wss://testnet.xrpl-labs.com',
-} as const
 
 export type ManagedTransaction =
   | EscrowCreate
@@ -892,9 +888,8 @@ export class EscrowLedger {
   }
 }
 
-export async function connectTestnet(node: keyof typeof TESTNET = 'ripple') {
-  const endpoint = TESTNET[node]
-  if (typeof endpoint !== 'string') throw new Error('Nodo Testnet sconosciuto')
+export async function connectTestnet(node?: string) {
+  const endpoint = testnetWsUrl(normalizeTestnetNode(node))
   const client = new Client(endpoint, {
     timeout: 10_000,
     connectionTimeout: 10_000,

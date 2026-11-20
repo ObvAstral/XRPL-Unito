@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AttemptStore } from './escrow/attempts.js'
 import { connectTestnet } from './escrow/ledger.js'
+import { normalizeTestnetNode } from './shared/testnet-node.js'
 import {
   createTestnetFaucetFunder,
   runSetupWallets,
@@ -19,7 +20,7 @@ Uso:
 Opzioni:
   --state-dir <dir>         Directory locale per segreti dev (0600), tentativi SQLite e public-config.json
                             (default: xrpl/.xrpl-local)
-  --node <ripple|xrplLabs>  Endpoint WebSocket Testnet (default: ripple, oppure env XRPL_TESTNET_NODE)
+  --node <ripple|xrplLabs>  Endpoint WebSocket Testnet (default: ripple, oppure env XRPL_TESTNET_NODE; alias xrpl-labs)
   --participants <file>     JSON opzionale con indirizzi gia' assegnati per alice, bob, cadAuthority,
                             billboardAuthority, operator
 
@@ -68,12 +69,7 @@ function parseArgs(argv: readonly string[]): ParsedCliArgs {
     throw new Error(`Opzione sconosciuta: ${arg}`)
   }
 
-  if (rawNode === 'xrpl-labs') rawNode = 'xrplLabs'
-  if (rawNode !== 'ripple' && rawNode !== 'xrplLabs') {
-    throw new Error('Nodo Testnet non valido: usare ripple oppure xrplLabs')
-  }
-
-  return { help: false, stateDir, node: rawNode, participantOverrides }
+  return { help: false, stateDir, node: normalizeTestnetNode(rawNode), participantOverrides }
 }
 
 async function main(): Promise<void> {
