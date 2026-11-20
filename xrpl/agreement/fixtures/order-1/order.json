@@ -1,0 +1,27 @@
+{
+  "protocol": "xrpl-unito-agreement",
+  "version": 1,
+  "network": "testnet",
+  "orderId": "demo-order-1",
+  "parties": {
+    "alice": { "address": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh" },
+    "bob": { "address": "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe" },
+    "oracle": { "address": "rDsbeomae4FXwgQTJp9Rs64Qg9vDiTCdBv" }
+  },
+  "nftId": "1111111111111111111111111111111111111111111111111111111111111111",
+  "offerId": "2222222222222222222222222222222222222222222222222222222222222222",
+  "filter": { "id": "negative", "version": 1 },
+  "input": { "id": "demo-1", "sha256": "72a56ba69e1187d7976b68d8ba7c8d526d70b9618623abcf538596a13a57b19a" },
+  "priceDrops": 1000000,
+  "condition": "A0258020A82A88B2DF843A54F58772E4A3861866ECDB4157645DD9AE528C1D3AEEDABAB6810120",
+  "deadlines": {
+    "offerExpiresAt": "2026-11-20T15:31:00Z",
+    "fundBy": "2026-11-20T15:31:30Z",
+    "startBy": "2026-11-20T15:31:45Z",
+    "deliverBy": "2026-11-20T15:32:00Z",
+    "finishAfter": "2026-11-20T15:32:00Z",
+    "cancelAfter": "2026-11-20T15:37:00Z"
+  },
+  "retentionSeconds": 86400,
+  "regulation": { "version": 1, "sha256": "115d5d5087b2bf5da930995757b2506d2a346a434e114b6ea67971b4ee046b05" }
+}

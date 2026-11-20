@@ -1,0 +1,7 @@
+Regolamento demo, versione 1
+
+Bob riceve il pass a zero XRP, deposita 1 XRP Testnet e avvia il lavoro entro la scadenza concordata.
+Alice consegna all’oracolo il PNG completo entro il termine, con il filtro e l’input dell’accordo.
+L’oracolo controlla i pixel e la puntualità, custodisce il PNG e conclude l’incasso solo dopo esito positivo.
+Dopo l’incasso validato Bob può ritirare il PNG per la durata concordata.
+In caso di mancata consegna conforme Bob può recuperare il deposito quando il ledger consente l’annullamento.

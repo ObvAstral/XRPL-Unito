@@ -1,0 +1,21 @@
+{
+  "orderId": "demo-order-1",
+  "network": "testnet",
+  "parties": {
+    "alice": {
+      "address": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEActotlOMgnnRIrYYqd6Zv9tgCOpnFGcw3zTtoQrj+Jh0=\n-----END PUBLIC KEY-----\n"
+    },
+    "bob": {
+      "address": "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEADhqnXCmurNmwljxdkizqjEatn+f0KISK1+15nD0Fb0k=\n-----END PUBLIC KEY-----\n"
+    },
+    "oracle": {
+      "address": "rDsbeomae4FXwgQTJp9Rs64Qg9vDiTCdBv"
+    }
+  },
+  "regulation": {
+    "version": 1,
+    "sha256": "115d5d5087b2bf5da930995757b2506d2a346a434e114b6ea67971b4ee046b05"
+  }
+}
