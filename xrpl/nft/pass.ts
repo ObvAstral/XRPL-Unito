@@ -87,7 +87,7 @@ function assertSnapshot(data: Fields, hash: string) {
   if (data.validated === false) throw new Error('Il nodo non ha ancora validato lo snapshot richiesto.')
 }
 
-async function readAtSnapshot(rpc: LedgerRequest, command: string, fields: Fields, hash: string) {
+export async function readAtSnapshot(rpc: LedgerRequest, command: string, fields: Fields, hash: string) {
   const request = { ...fields, ledger_hash: hash }
   let data = await rpc(command, request)
   // A load-balanced node can be briefly behind the instance that supplied the header.
@@ -99,7 +99,7 @@ async function readAtSnapshot(rpc: LedgerRequest, command: string, fields: Field
   return data
 }
 
-async function findOwnedNft(rpc: LedgerRequest, account: string, nftId: string, hash: string) {
+export async function findOwnedNft(rpc: LedgerRequest, account: string, nftId: string, hash: string) {
   const markers = new Set<string>()
   let marker: unknown
   do {

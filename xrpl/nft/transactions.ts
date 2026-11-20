@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { setTimeout as sleep } from 'node:timers/promises'
+import type { Transaction } from 'xrpl'
 import { readHash, readUint32, readValidatedLedger, recentSnapshot, record } from './pass.js'
-import type { Fields, LedgerRequest, NftTransaction, Snapshot } from './pass.js'
+import type { Fields, LedgerRequest, Snapshot } from './pass.js'
 import { RpcError } from './rpc.js'
 
 interface Receipt {
@@ -30,9 +31,9 @@ interface StoredAttempt {
   outcome: Outcome | null
 }
 
-interface Signer {
+interface Signer<T extends Transaction> {
   classicAddress: string
-  sign: (tx: NftTransaction) => { hash: string; tx_blob: string }
+  sign: (tx: T) => { hash: string; tx_blob: string }
 }
 
 export class AttemptJournal {
@@ -129,7 +130,7 @@ async function finalize(rpc: LedgerRequest, attempt: SignedAttempt): Promise<Out
   return { status: 'validated', receipt: { txHash: attempt.hash, ledgerHash: hash, ledgerIndex: index }, meta }
 }
 
-async function prepare(rpc: LedgerRequest, tx: NftTransaction, snapshot: Snapshot, fee: string) {
+async function prepare<T extends Transaction>(rpc: LedgerRequest, tx: T, snapshot: Snapshot, fee: string) {
   const account = await rpc('account_info', { account: tx.Account, ledger_hash: snapshot.hash })
   if (account.validated === false || readHash(account.ledger_hash) !== snapshot.hash) {
     throw new Error('Sequence non disponibile sullo snapshot selezionato.')
@@ -152,12 +153,12 @@ async function readFee(rpc: LedgerRequest): Promise<string> {
   return open_ledger_fee
 }
 
-interface RunOptions {
+interface RunOptions<T extends Transaction> {
   rpc: LedgerRequest
   journal: AttemptJournal
-  signer: Signer
+  signer: Signer<T>
   orderId: string
-  tx: NftTransaction
+  tx: T
   /** Terms not included in the XRPL transaction, fixed for reconciliation. */
   context?: Fields
   preflight?: (snapshot: Snapshot) => Promise<void>
@@ -165,7 +166,7 @@ interface RunOptions {
   pause?: () => Promise<void>
 }
 
-export async function runTransaction(options: RunOptions): Promise<Outcome> {
+export async function runTransaction<T extends Transaction>(options: RunOptions<T>): Promise<Outcome> {
   const { rpc, journal, signer, orderId, tx, preflight, confirm, pause = () => sleep(1800) } = options
   if (signer.classicAddress !== tx.Account) throw new Error('Il wallet non può firmare per questo ruolo.')
 
