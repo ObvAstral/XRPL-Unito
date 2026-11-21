@@ -117,7 +117,7 @@ XRPL_MODE=testnet npm --prefix xrpl start
 
 ### Superfici web servite
 
-- `GET /` — Marketplace, login wallet firmato, barra dei preset simulati (`pending_authority`, `pass_delivered_missing_deposit`, `active_rental`, `expired_rental`, `expired_rental_and_license`), pannelli Alice, Bob ed Ente, ricevute XRPL e firme multifirma 2-su-3.
+- `GET /` — Marketplace con scelta del wallet e della risorsa. Per ogni ordine mostra lo stato e l’azione disponibile al ruolo collegato. Apri **Ricevute XRPL** per gli hash o **Comandi della simulazione** per i preset CAD e i salti di fase.
 - `GET /cad` — Portale CAD dimostrativo con pulsante **Apri progetto demo**, testi per Alice e Bob in fuso `Europe/Rome`, polling ogni 2 secondi e chiusura automatica alla scadenza.
 - `GET /schermo/torino-01` — Player a pieno schermo del cartellone digitale: bianco prima della pubblicazione e alla scadenza, immagine `object-fit: cover` durante il periodo autorizzato.
 
