@@ -2,11 +2,11 @@ import { demoThemeTokens } from './marketplace-theme.js'
 
 export function renderCadPortalHtml(): string {
   return `<!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Posto CAD · Affitti XRPL Deep Tech</title>
+  <title>CAD Seat · XRPL Rentals Deep Tech</title>
   <style>
     ${demoThemeTokens}
     * { box-sizing: border-box; }
@@ -423,20 +423,20 @@ export function renderCadPortalHtml(): string {
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#main">Vai al contenuto</a>
+  <a class="skip-link" href="#main">Skip to content</a>
   <header>
     <div class="topbar">
       <a class="brand" href="/">
         <span class="brand-icon" aria-hidden="true">
           <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </span>
-        <span>Affitti XRPL<small>Torna al marketplace</small></span>
+        <span>XRPL Rentals<small>Back to marketplace</small></span>
       </a>
       <details class="account" id="account" hidden>
         <summary><span id="actor"></span><span id="address" class="address"></span></summary>
         <div class="switcher">
-          <button type="button" class="secondary" data-login="alice">Passa ad Alice</button>
-          <button type="button" class="secondary" data-login="bob">Passa a Bob</button>
+          <button type="button" class="secondary" data-login="alice">Switch to Alice</button>
+          <button type="button" class="secondary" data-login="bob">Switch to Bob</button>
         </div>
       </details>
     </div>
@@ -447,10 +447,10 @@ export function renderCadPortalHtml(): string {
       <div>
         <div class="eyebrow">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
-          Portale di progettazione · CAD
+          Design Portal · CAD
         </div>
-        <h1 id="seat">Posto CAD</h1>
-        <p>Verifica crittografica istantanea su snapshot XRPL validato: titolarità NFT annuale, pass temporaneo firmato dall’ente ed escrow attivo.</p>
+        <h1 id="seat">CAD Seat</h1>
+        <p>Instant cryptographic verification on a validated XRPL snapshot: annual NFT ownership, authority-signed temporary pass, and active escrow.</p>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <svg viewBox="0 0 360 110" width="100%" height="auto" role="presentation">
@@ -460,31 +460,31 @@ export function renderCadPortalHtml(): string {
           </g>
           <rect x="10" y="30" width="85" height="50" rx="6" fill="#1A1A1A" stroke="#76B900"/>
           <text x="52" y="52" text-anchor="middle" fill="#F0F2F5" font-family="Roboto Mono, monospace" font-size="10" font-weight="700">ALICE NFT</text>
-          <text x="52" y="67" text-anchor="middle" fill="#BDBDBD" font-family="Roboto Mono, monospace" font-size="8">Titolo Base</text>
+          <text x="52" y="67" text-anchor="middle" fill="#BDBDBD" font-family="Roboto Mono, monospace" font-size="8">Base Title</text>
 
           <rect x="140" y="25" width="80" height="60" rx="6" fill="#1A1A1A" stroke="#00BFFF"/>
-          <text x="180" y="51" text-anchor="middle" fill="#00BFFF" font-family="Roboto Mono, monospace" font-size="10" font-weight="700">GUARDIANO</text>
+          <text x="180" y="51" text-anchor="middle" fill="#00BFFF" font-family="Roboto Mono, monospace" font-size="10" font-weight="700">GUARDIAN</text>
           <text x="180" y="66" text-anchor="middle" fill="#6EFA5F" font-family="Roboto Mono, monospace" font-size="8">XRPL Snapshot</text>
 
           <rect x="265" y="30" width="85" height="50" rx="6" fill="#1A1A1A" stroke="#6EFA5F"/>
           <text x="307" y="52" text-anchor="middle" fill="#F0F2F5" font-family="Roboto Mono, monospace" font-size="10" font-weight="700">BOB PASS</text>
-          <text x="307" y="67" text-anchor="middle" fill="#6EFA5F" font-family="Roboto Mono, monospace" font-size="8">Slot Attivo</text>
+          <text x="307" y="67" text-anchor="middle" fill="#6EFA5F" font-family="Roboto Mono, monospace" font-size="8">Active Slot</text>
         </svg>
       </div>
     </section>
 
     <section class="card access-card" id="access-card" data-state="pending" aria-labelledby="headline">
       <div role="status" aria-atomic="true">
-        <div class="status-label" id="status-label">Verifica in corso</div>
-        <h2 id="headline" tabindex="-1">Verifica dell’accesso</h2>
+        <div class="status-label" id="status-label">Verifying access</div>
+        <h2 id="headline" tabindex="-1">Access verification</h2>
         <p id="reason" hidden></p>
       </div>
       <div id="login-actions" class="actions" hidden>
-        <button type="button" data-login="alice">Accedi come Alice</button>
-        <button type="button" class="secondary" data-login="bob">Accedi come Bob</button>
+        <button type="button" data-login="alice">Sign in as Alice</button>
+        <button type="button" class="secondary" data-login="bob">Sign in as Bob</button>
       </div>
       <div id="project-action" class="actions" hidden>
-        <button type="button" id="open-project">Apri progetto demo</button>
+        <button type="button" id="open-project">Open demo project</button>
       </div>
       <p class="error" id="action-error" role="alert" hidden></p>
     </section>
@@ -492,17 +492,17 @@ export function renderCadPortalHtml(): string {
     <section class="card project-card" id="project" aria-labelledby="project-title" hidden>
       <div class="project-heading">
         <div>
-          <div class="eyebrow">Tavola di progetto · Telemetria CAD</div>
+          <div class="eyebrow">Project Sheet · CAD Telemetry</div>
           <h2 id="project-title" tabindex="-1"></h2>
         </div>
-        <span class="status-label">Sessione CAD protetta</span>
+        <span class="status-label">Protected CAD session</span>
       </div>
       <div class="drawing">
         <div class="drawing-view">
-          <div class="view-label"><span>01 / VISTA FRONTALE</span><span>SCALA 1:1</span></div>
+          <div class="view-label"><span>01 / FRONT VIEW</span><span>SCALE 1:1</span></div>
           <svg class="cad-svg" viewBox="0 0 440 440" role="img" aria-labelledby="front-title front-desc">
-            <title id="front-title">Rotismo epicicloidale a tre satelliti</title>
-            <desc id="front-desc">Corona fissa esterna da 72 denti, sole centrale da 24 denti e tre satelliti da 24 denti su portasatelliti. Diametro esterno 170 millimetri.</desc>
+            <title id="front-title">Three-planet epicyclic gear train</title>
+            <desc id="front-desc">72-tooth outer fixed ring gear, 24-tooth central sun gear, and three 24-tooth planet gears on a carrier. Outer diameter 170 millimeters.</desc>
             <defs>
               <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#1F2E1F" stroke-width=".7"/></pattern>
               <marker id="arrow" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto-start-reverse"><path d="M7 0L0 3.5L7 7" fill="none" stroke="#76B900" stroke-width="1"/></marker>
@@ -521,14 +521,14 @@ export function renderCadPortalHtml(): string {
             <g fill="#6EFA5F" font-family="Roboto Mono, monospace" font-size="15"><text x="220" y="37" text-anchor="middle">Ø170</text></g>
             <g fill="none" stroke="#00BFFF" stroke-width="1"><path d="M325 133L365 105H420"/><path d="M255 248L353 310H420"/><path d="M194 258L116 382H20"/></g>
             <g fill="#F0F2F5" font-family="Roboto Mono, monospace" font-size="13"><text x="367" y="98">01</text><text x="367" y="302">02</text><text x="24" y="375">03</text></g>
-            <g fill="#BDBDBD" font-family="Roboto Mono, monospace" font-size="12"><text x="20" y="423">01 CORONA · 02 SOLE · 03 SATELLITI</text></g>
+            <g fill="#BDBDBD" font-family="Roboto Mono, monospace" font-size="12"><text x="20" y="423">01 RING · 02 SUN · 03 PLANETS</text></g>
           </svg>
         </div>
         <div class="drawing-view">
-          <div class="view-label"><span>02 / SEZIONE LONGITUDINALE A–A</span><span>ISO H7</span></div>
+          <div class="view-label"><span>02 / LONGITUDINAL SECTION A–A</span><span>ISO H7</span></div>
           <svg class="cad-svg" viewBox="0 0 400 440" role="img" aria-labelledby="section-title section-desc">
-            <title id="section-title">Sezione del carter e degli alberi</title>
-            <desc id="section-desc">Carter esterno, cuscinetti, albero di ingresso e uscita coassiali. Ingombro assiale del carter 120 millimetri; foro albero con tolleranza H7.</desc>
+            <title id="section-title">Housing and shaft cross-section</title>
+            <desc id="section-desc">Outer housing, bearings, coaxial input and output shafts. Housing axial length 120 millimeters; shaft bore with H7 tolerance.</desc>
             <defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V7" stroke="#4A6B4A" stroke-width="1"/></pattern></defs>
             <g stroke="#4A6B4A" stroke-width=".8" stroke-dasharray="10 4 2 4"><path d="M15 225H385"/><path d="M200 75V370"/></g>
             <g fill="url(#hatch)" stroke="#76B900" stroke-width="1.5"><path d="M88 118H312V179H286V145H114V179H88Z"/><path d="M88 271H114V305H286V271H312V332H88Z"/><path d="M87 179H112V271H87ZM288 179H313V271H288Z"/></g>
@@ -537,16 +537,16 @@ export function renderCadPortalHtml(): string {
             <g fill="#263318" stroke="#6EFA5F" stroke-width="1.5"><path d="M143 175H175V208H143ZM143 242H175V275H143Z"/><path d="M230 170H260V205H230ZM230 245H260V280H230Z"/></g>
             <g fill="none" stroke="#00BFFF" stroke-width="1"><path d="M88 180L112 204M112 180L88 204M88 247L112 271M112 247L88 271M288 180L312 204M312 180L288 204M288 247L312 271M312 247L288 271"/></g>
             <g fill="none" stroke="#76B900" stroke-width="1"><path d="M88 340V374M312 340V374"/><path d="M92 365H308" marker-start="url(#arrow)" marker-end="url(#arrow)"/><path d="M56 211V175H20M345 242V284H380"/></g>
-            <g fill="#6EFA5F" font-family="Roboto Mono, monospace" font-size="14"><text x="200" y="390" text-anchor="middle">120</text><text x="20" y="162">INGRESSO</text><text x="310" y="304">USCITA</text></g>
-            <g fill="#BDBDBD" font-family="Roboto Mono, monospace" font-size="12"><text x="25" y="423">QUOTE IN mm · SCHEMA DIMOSTRATIVO</text></g>
+            <g fill="#6EFA5F" font-family="Roboto Mono, monospace" font-size="14"><text x="200" y="390" text-anchor="middle">120</text><text x="20" y="162">INPUT</text><text x="310" y="304">OUTPUT</text></g>
+            <g fill="#BDBDBD" font-family="Roboto Mono, monospace" font-size="12"><text x="25" y="423">DIMENSIONS IN mm · DEMO SCHEMATIC</text></g>
           </svg>
         </div>
       </div>
       <dl class="drawing-facts">
-        <div><dt>Configurazione</dt><dd>3 satelliti</dd></div>
-        <div><dt>Denti sole / corona</dt><dd>24 / 72</dd></div>
-        <div><dt>Rapporto di riduzione</dt><dd>4 : 1</dd></div>
-        <div><dt>Tolleranza foro</dt><dd>H7</dd></div>
+        <div><dt>Configuration</dt><dd>3 planets</dd></div>
+        <div><dt>Sun / ring teeth</dt><dd>24 / 72</dd></div>
+        <div><dt>Reduction ratio</dt><dd>4 : 1</dd></div>
+        <div><dt>Bore tolerance</dt><dd>H7</dd></div>
       </dl>
     </section>
   </main>
@@ -554,8 +554,8 @@ export function renderCadPortalHtml(): string {
   <script>
     const el = (id) => document.getElementById(id);
     const loginButtons = document.querySelectorAll('[data-login]');
-    const names = { alice: 'Alice', bob: 'Bob', authority: 'Ente' };
-    const dateFormatter = new Intl.DateTimeFormat('it-IT', {
+    const names = { alice: 'Alice', bob: 'Bob', authority: 'Authority' };
+    const dateFormatter = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Europe/Rome', day: 'numeric', month: 'long', year: 'numeric',
       hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
     });
@@ -573,7 +573,7 @@ export function renderCadPortalHtml(): string {
 
     function message(headline, reason = '', state = 'pending') {
       el('access-card').dataset.state = state;
-      text('status-label', { pending: 'Verifica in corso', active: 'Accesso autorizzato', inactive: 'Accesso al progetto', error: 'Connessione da verificare' }[state]);
+      text('status-label', { pending: 'Verifying access', active: 'Access authorized', inactive: 'Project access', error: 'Connection check required' }[state]);
       text('headline', headline);
       text('reason', reason);
       el('reason').hidden = !reason;
@@ -602,7 +602,7 @@ export function renderCadPortalHtml(): string {
 
     async function send(url, body) {
       const { response, data } = await request(url, body);
-      if (!response.ok) throw new Error(data.message || 'Accesso al wallet non riuscito.');
+      if (!response.ok) throw new Error(data.message || 'Wallet sign-in failed.');
       return data;
     }
 
@@ -630,7 +630,7 @@ export function renderCadPortalHtml(): string {
       deadlineAt = null;
       closeProject();
       el('project-action').hidden = true;
-      message('Verifica dell’accesso');
+      message('Verifying access');
       refreshAccess();
     }
 
@@ -648,13 +648,13 @@ export function renderCadPortalHtml(): string {
       el('project-action').hidden = !hasAccess || Boolean(openedBy);
 
       if (access.code === 'SESSION_REQUIRED') {
-        message('Collega il wallet', 'Scegli un profilo demo per verificare la disponibilità della licenza CAD.', 'inactive');
+        message('Connect wallet', 'Choose a demo profile to check CAD license availability.', 'inactive');
       } else if (access.canAccess && !hasAccess) {
-        message('Verifica dell’accesso');
+        message('Verifying access');
       } else if (access.code === 'ALICE_SUSPENDED') {
-        message('Licenza in affitto', access.reason, 'inactive');
+        message('License rented out', access.reason, 'inactive');
       } else if (access.code === 'BOB_ACTIVE') {
-        message('Pass attivo', 'Accesso disponibile fino al ' + dateFormatter.format(Date.parse(access.activeUntilUtc)) + '.', 'active');
+        message('Pass active', 'Access available until ' + dateFormatter.format(Date.parse(access.activeUntilUtc)) + '.', 'active');
       } else {
         message(access.headline, access.reason === access.headline ? '' : access.reason, hasAccess ? 'active' : 'inactive');
       }
@@ -664,7 +664,7 @@ export function renderCadPortalHtml(): string {
     async function fetchAccess() {
       const startedAt = performance.now();
       const { data } = await request('/api/risorse/cad/accesso');
-      if (typeof data?.canAccess !== 'boolean') throw new Error('Risposta del server non disponibile.');
+      if (typeof data?.canAccess !== 'boolean') throw new Error('Server response unavailable.');
       return { data, startedAt };
     }
 
@@ -680,7 +680,7 @@ export function renderCadPortalHtml(): string {
         if (current !== operation) return;
         el('project-action').hidden = true;
         if (deadlineAt === null) closeProject();
-        message('Connessione non disponibile', 'Riproveremo automaticamente.', 'error');
+        message('Connection unavailable', 'Retrying automatically.', 'error');
       } finally {
         polling = false;
       }
@@ -697,7 +697,7 @@ export function renderCadPortalHtml(): string {
     function setBusy(value) {
       busy = value;
       el('access-card').setAttribute('aria-busy', String(value));
-      text('open-project', value ? 'Attendi…' : 'Apri progetto demo');
+      text('open-project', value ? 'Please wait…' : 'Open demo project');
       el('open-project').disabled = value;
       for (const button of loginButtons) button.disabled = value;
     }
@@ -710,7 +710,7 @@ export function renderCadPortalHtml(): string {
       el('account').open = false;
       el('project-action').hidden = true;
       showError();
-      message('Collegamento del wallet');
+      message('Connecting wallet');
       try {
         const { challenge } = await send('/api/wallet/challenge', {});
         const { id, proof } = await send('/api/local-signer/login', { challenge, role });
@@ -720,7 +720,7 @@ export function renderCadPortalHtml(): string {
         el('headline').focus({ preventScroll: true });
       } catch (error) {
         el('login-actions').hidden = !el('account').hidden;
-        message('Collegamento non riuscito', '', 'error');
+        message('Connection failed', '', 'error');
         showError(error.message);
       } finally {
         setBusy(false);
@@ -735,7 +735,7 @@ export function renderCadPortalHtml(): string {
       try {
         const startedAt = performance.now();
         const { response, data } = await request('/api/cad/cad/progetto');
-        if (!response.ok) throw new Error(data.message || 'Accesso al progetto non disponibile.');
+        if (!response.ok) throw new Error(data.message || 'Project access unavailable.');
         if (!applyAccess(data.access, startedAt)) return;
         openedBy = data.project.openedByAddress;
         text('project-title', data.project.title);

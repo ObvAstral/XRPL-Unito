@@ -62,7 +62,7 @@ async function readRawBody(req: IncomingMessage, limitBytes: number): Promise<Bu
     const buf = typeof chunk === 'string' ? Buffer.from(chunk) : (chunk as Buffer)
     total += buf.length
     if (total > limitBytes) {
-      throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'Corpo della richiesta oltre il limite consentito.')
+      throw new HttpError(413, 'PAYLOAD_TOO_LARGE', 'Request body exceeds allowed size limit.')
     }
     chunks.push(buf)
   }
@@ -75,24 +75,24 @@ async function readJsonBody<T = Record<string, unknown>>(req: IncomingMessage): 
   try {
     return JSON.parse(buf.toString('utf8')) as T
   } catch {
-    throw new HttpError(400, 'INVALID_JSON', 'Corpo JSON non valido.')
+    throw new HttpError(400, 'INVALID_JSON', 'Invalid JSON body.')
   }
 }
 
 function extractMultipartFile(body: Buffer, contentType: string): Buffer {
   const match = /boundary=([^;\s]+)/i.exec(contentType)
   if (!match?.[1]) {
-    throw new HttpError(400, 'INVALID_MULTIPART', 'Boundary multipart mancante.')
+    throw new HttpError(400, 'INVALID_MULTIPART', 'Missing multipart boundary.')
   }
   const boundary = match[1].replace(/^"(.*)"$/, '$1')
   const marker = Buffer.from(`--${boundary}`)
   const start = body.indexOf(marker)
-  if (start < 0) throw new HttpError(400, 'INVALID_MULTIPART', 'Parte multipart non trovata.')
+  if (start < 0) throw new HttpError(400, 'INVALID_MULTIPART', 'Multipart part not found.')
   const headerEnd = body.indexOf(Buffer.from('\r\n\r\n'), start)
-  if (headerEnd < 0) throw new HttpError(400, 'INVALID_MULTIPART', 'Intestazioni multipart incomplete.')
+  if (headerEnd < 0) throw new HttpError(400, 'INVALID_MULTIPART', 'Incomplete multipart headers.')
   const contentStart = headerEnd + 4
   const nextBoundary = body.indexOf(Buffer.from(`\r\n--${boundary}`), contentStart)
-  if (nextBoundary < 0) throw new HttpError(400, 'INVALID_MULTIPART', 'Chiusura multipart mancante.')
+  if (nextBoundary < 0) throw new HttpError(400, 'INVALID_MULTIPART', 'Missing multipart closing boundary.')
   return body.subarray(contentStart, nextBoundary)
 }
 
@@ -124,7 +124,7 @@ export function createAppServer(service: RentalPlatformService): {
       const parsedUrl = new URL(req.url ?? '/', 'http://localhost')
       const pathname = parsedUrl.pathname
 
-      // --- Pagine HTML ---
+      // --- HTML Pages ---
       if (method === 'GET' && pathname === '/') {
         sendHtml(res, 200, renderMarketplaceHtml())
         return
@@ -141,7 +141,7 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Sessioni Wallet ---
+      // --- Wallet Sessions ---
       if (method === 'POST' && pathname === '/api/wallet/challenge') {
         await readJsonBody(req)
         const existingRef = getSessionRefFromRequest(req) ?? undefined
@@ -154,7 +154,7 @@ export function createAppServer(service: RentalPlatformService): {
         const body = await readJsonBody<{ id?: string; proof?: unknown; sessionRef?: string }>(req)
         const ref = getSessionRefFromRequest(req) ?? body.sessionRef ?? ''
         if (!body.id || !body.proof) {
-          throw new HttpError(400, 'INVALID_LOGIN_PAYLOAD', 'Richiesti id e proof della firma monouso.')
+          throw new HttpError(400, 'INVALID_LOGIN_PAYLOAD', 'One-time signature id and proof are required.')
         }
         const session = service.verifyWalletSession(ref, body.id, body.proof)
         setSessionCookie(res, session.sessionRef)
@@ -172,11 +172,11 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Helper firmatario locale per la demo su singolo PC ---
+      // --- Local signer helpers for single-PC demo ---
       if (method === 'POST' && pathname === '/api/local-signer/login') {
         const body = await readJsonBody<{ challenge?: LoginChallenge; role?: LocalDemoRole }>(req)
         if (!body.challenge || !body.role) {
-          throw new HttpError(400, 'INVALID_LOCAL_SIGN_INPUT', 'Richiesti challenge e role.')
+          throw new HttpError(400, 'INVALID_LOCAL_SIGN_INPUT', 'challenge and role are required.')
         }
         sendJson(res, 200, service.signLoginLocally(body.challenge, body.role))
         return
@@ -192,7 +192,7 @@ export function createAppServer(service: RentalPlatformService): {
           role?: LocalDemoRole
         }>(req)
         if (!body.resourceId || !body.startsAt || !body.endsAt || !body.priceDrops) {
-          throw new HttpError(400, 'INVALID_PROPOSAL_INPUT', 'Campi proposta incompleti.')
+          throw new HttpError(400, 'INVALID_PROPOSAL_INPUT', 'Incomplete proposal fields.')
         }
         sendJson(
           res,
@@ -218,7 +218,7 @@ export function createAppServer(service: RentalPlatformService): {
           role?: LocalDemoRole
         }>(req)
         if (!body.listingId) {
-          throw new HttpError(400, 'LISTING_ID_REQUIRED', 'listingId richiesto.')
+          throw new HttpError(400, 'LISTING_ID_REQUIRED', 'listingId is required.')
         }
         sendJson(
           res,
@@ -236,13 +236,13 @@ export function createAppServer(service: RentalPlatformService): {
       if (method === 'POST' && pathname === '/api/local-signer/vault-signature') {
         const body = await readJsonBody<{ orderId?: string; role?: LocalDemoRole }>(req)
         if (!body.orderId || !body.role) {
-          throw new HttpError(400, 'INVALID_MULTISIG_INPUT', 'Richiesti orderId e role.')
+          throw new HttpError(400, 'INVALID_MULTISIG_INPUT', 'orderId and role are required.')
         }
         sendJson(res, 200, await service.signVaultPartialLocally(body.orderId, body.role))
         return
       }
 
-      // --- Risorse e Controllo Accesso ---
+      // --- Resources and Access Verification ---
       if (method === 'GET' && pathname === '/api/risorse') {
         sendJson(res, 200, service.listResources())
         return
@@ -264,7 +264,7 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Annunci e Accettazione Ordini ---
+      // --- Listings and Order Acceptance ---
       if (method === 'GET' && pathname === '/api/annunci') {
         sendJson(res, 200, service.listListings())
         return
@@ -283,7 +283,7 @@ export function createAppServer(service: RentalPlatformService): {
         const listingId = decodeURIComponent(createOrderMatch[1])
         const body = await readJsonBody<{ acceptance?: SignedOrder }>(req)
         if (!body.acceptance) {
-          throw new HttpError(400, 'ACCEPTANCE_REQUIRED', 'Accettazione firmata da Bob mancante.')
+          throw new HttpError(400, 'ACCEPTANCE_REQUIRED', 'Missing Bob signed acceptance.')
         }
         const created = await service.acceptListingOrder(
           getSessionRefFromRequest(req),
@@ -294,7 +294,7 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Ordini, Decisioni, Pagamenti, Recupero ---
+      // --- Orders, Decisions, Payments, Recovery ---
       if (method === 'GET' && pathname === '/api/ordini') {
         const resourceId = parsedUrl.searchParams.get('resourceId') ?? undefined
         sendJson(res, 200, await service.listOrderViews(resourceId))
@@ -309,7 +309,7 @@ export function createAppServer(service: RentalPlatformService): {
       if (method === 'POST' && orderDecisionMatch?.[1]) {
         const body = await readJsonBody<{ decision?: 'approve' | 'reject'; reason?: string }>(req)
         if (body.decision !== 'approve' && body.decision !== 'reject') {
-          throw new HttpError(400, 'INVALID_DECISION', 'decision deve essere approve oppure reject.')
+          throw new HttpError(400, 'INVALID_DECISION', 'decision must be approve or reject.')
         }
         const order = await service.decideOrder(
           getSessionRefFromRequest(req),
@@ -378,7 +378,7 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Portale CAD protetto ---
+      // --- Protected CAD Portal ---
       const cadProjectMatch = /^\/api\/cad\/([^/]+)\/progetto$/.exec(pathname)
       if (method === 'GET' && cadProjectMatch?.[1]) {
         const data = await service.openCadDemoProject(
@@ -389,7 +389,7 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Cartellone pubblicitario ---
+      // --- Digital Billboard ---
       const bbUploadMatch = /^\/api\/cartelloni\/([^/]+)\/immagine$/.exec(pathname)
       if (method === 'POST' && bbUploadMatch?.[1]) {
         const raw = await readRawBody(req, MAX_UPLOAD_BODY)
@@ -434,7 +434,7 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Simulazione, Primo Scambio ---
+      // --- Simulation, Sample Exchange ---
       if (method === 'GET' && pathname === '/api/simulazione/stato') {
         sendJson(res, 200, service.getSimulationStatus())
         return
@@ -442,7 +442,7 @@ export function createAppServer(service: RentalPlatformService): {
       if (method === 'POST' && pathname === '/api/simulazione/preset') {
         const body = await readJsonBody<{ preset?: SimulatedPresetName }>(req)
         if (!body.preset) {
-          throw new HttpError(400, 'PRESET_REQUIRED', 'Specificare il preset simulato.')
+          throw new HttpError(400, 'PRESET_REQUIRED', 'Specify the simulated preset.')
         }
         sendJson(res, 200, await service.applySimulatedPreset(body.preset))
         return
@@ -450,7 +450,7 @@ export function createAppServer(service: RentalPlatformService): {
       if (method === 'POST' && pathname === '/api/simulazione/tempo') {
         const body = await readJsonBody<{ seconds?: number }>(req)
         if (typeof body.seconds !== 'number' || !Number.isFinite(body.seconds) || body.seconds < 1) {
-          throw new HttpError(400, 'INVALID_SECONDS', 'seconds deve essere un numero positivo.')
+          throw new HttpError(400, 'INVALID_SECONDS', 'seconds must be a positive number.')
         }
         sendJson(res, 200, service.advanceSimulatedTime(body.seconds))
         return
@@ -460,13 +460,13 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      sendJson(res, 404, { code: 'NOT_FOUND', message: `Percorso non trovato: ${method} ${pathname}` })
+      sendJson(res, 404, { code: 'NOT_FOUND', message: `Route not found: ${method} ${pathname}` })
     } catch (error) {
       if (error instanceof HttpError) {
         sendJson(res, error.statusCode, { code: error.code, message: error.message })
         return
       }
-      const msg = error instanceof Error ? error.message : 'Errore interno del server.'
+      const msg = error instanceof Error ? error.message : 'Internal server error.'
       sendJson(res, 500, { code: 'INTERNAL_ERROR', message: msg })
     }
   })
@@ -515,10 +515,10 @@ async function main(): Promise<void> {
   const app = createAppServer(service)
   const baseUrl = await app.listen(port, host)
   process.stdout.write(
-    `Server Affitti XRPL v2 (${mode}) avviato su ${baseUrl}\n` +
+    `XRPL Rentals v2 Server (${mode}) started on ${baseUrl}\n` +
       `- Marketplace: ${baseUrl}/\n` +
-      `- Portale CAD: ${baseUrl}/cad\n` +
-      `- Cartellone: ${baseUrl}/schermo/torino-01\n`,
+      `- CAD Portal: ${baseUrl}/cad\n` +
+      `- Billboard: ${baseUrl}/schermo/torino-01\n`,
   )
 
   const shutdown = async () => {

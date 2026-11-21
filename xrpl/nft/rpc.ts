@@ -7,7 +7,7 @@ export class RpcError extends Error {
   searchedAll: boolean
 
   constructor(code: string, searchedAll = false) {
-    super(`Errore XRPL: ${code}`)
+    super(`XRPL error: ${code}`)
     this.code = code
     this.searchedAll = searchedAll
   }
@@ -23,17 +23,17 @@ export async function connectTestnet(nodeName?: string): Promise<LedgerRequest> 
       redirect: 'error',
       signal: AbortSignal.timeout(8_000),
     })
-    if (!response.ok) throw new Error(`RPC Testnet ha risposto HTTP ${response.status}.`)
+    if (!response.ok) throw new Error(`Testnet RPC responded HTTP ${response.status}.`)
     const data = record(await response.json())
     const result = data.result === undefined ? data : record(data.result)
     if (typeof result.error === 'string') throw new RpcError(result.error, result.searched_all === true)
-    if (result.status !== 'success') throw new Error('Risposta RPC Testnet non valida.')
+    if (result.status !== 'success') throw new Error('Invalid Testnet RPC response.')
     return result
   }
 
   const info = record((await rpc('server_info')).info)
   if (info.network_id !== undefined && info.network_id !== 1) {
-    throw new Error('Il nodo configurato non appartiene alla XRPL Testnet.')
+    throw new Error('Configured node does not belong to XRPL Testnet.')
   }
   return rpc
 }

@@ -73,7 +73,7 @@ export interface FeeRefundAttemptResult extends AttemptResult {
 
 export type VaultPayoutProgress =
   | {
-      /** UI: "in attesa di firma" */
+      /** UI: "awaiting signatures" */
       readonly phase: 'awaiting_signatures'
       readonly orderId: string
       readonly vault: string
@@ -87,18 +87,18 @@ export type VaultPayoutProgress =
       readonly lastLedgerSequence: number
     }
   | {
-      /** UI: "in attesa del ledger" */
+      /** UI: "awaiting ledger" */
       readonly phase: 'awaiting_ledger'
       readonly attempt: AttemptResult
     }
   | {
-      /** Liquidazione completata e validata sul ledger */
+      /** Settlement completed and validated on ledger */
       readonly phase: 'validated'
       readonly attempt: AttemptResult
       readonly payment: PaymentReceipt
     }
   | {
-      /** Tentativo fallito o scaduto sul ledger: riconciliato e pronto a nuova preparazione */
+      /** Attempt failed or expired on ledger: reconciled and ready for re-preparation */
       readonly phase: 'failed' | 'expired'
       readonly attempt: AttemptResult
     }
@@ -129,10 +129,10 @@ function verifyAndExtractPartialSignature(
 ): DecodedPartialSigner {
   const decoded = decode(partialTxBlob) as Record<string, unknown>
   if (decoded.SigningPubKey !== '' || decoded.TxnSignature !== undefined) {
-    throw new Error('Il blob parziale deve essere firmato in modalita’ multifirma (SigningPubKey vuota)')
+    throw new Error('Partial blob must be signed in multisig mode (empty SigningPubKey)')
   }
   if (!Array.isArray(decoded.Signers) || decoded.Signers.length !== 1) {
-    throw new Error('Il blob parziale deve contenere esattamente un firmatario in Signers')
+    throw new Error('Partial blob must contain exactly one signer in Signers')
   }
   const wrapper = decoded.Signers[0] as { Signer?: Partial<DecodedPartialSigner> } | undefined
   const signer = wrapper?.Signer
@@ -142,18 +142,18 @@ function verifyAndExtractPartialSignature(
     typeof signer.SigningPubKey !== 'string' ||
     typeof signer.TxnSignature !== 'string'
   ) {
-    throw new Error('Struttura Signer non valida nel blob parziale')
+    throw new Error('Invalid Signer structure in partial blob')
   }
   if (!allowedSigners.includes(signer.Account)) {
     throw new Error(
-      `Firmatario ${signer.Account} non autorizzato per questa modalita’ di liquidazione`,
+      `Signer ${signer.Account} is not authorized for this settlement mode`,
     )
   }
   if (deriveAddress(signer.SigningPubKey) !== signer.Account) {
-    throw new Error('Chiave pubblica non corrispondente all’indirizzo del firmatario')
+    throw new Error('Public key does not match signer address')
   }
 
-  // Confronta tutti i campi della transazione con la bozza preparata dal backend.
+  // Compare all transaction fields against the draft prepared by the backend.
   if (
     decoded.TransactionType !== 'Payment' ||
     decoded.Account !== expectedTx.Account ||
@@ -166,7 +166,7 @@ function verifyAndExtractPartialSignature(
     decoded.Delegate !== undefined ||
     decoded.Flags !== expectedTx.Flags
   ) {
-    throw new Error('Il blob firmato non coincide con la transazione Payment preparata dal backend')
+    throw new Error('Signed blob does not match backend-prepared Payment transaction')
   }
 
   const expectedMemo = expectedTx.Memos?.[0]?.Memo
@@ -178,12 +178,12 @@ function verifyAndExtractPartialSignature(
     actualMemos[0]?.Memo?.MemoType !== expectedMemo.MemoType ||
     actualMemos[0]?.Memo?.MemoData !== expectedMemo.MemoData
   ) {
-    throw new Error('Memo dell’ordine assente o alterato nella firma parziale')
+    throw new Error('Order memo missing or altered in partial signature')
   }
 
   const signingPayload = encodeForMultiSigning(expectedTx, signer.Account)
   if (!verifyKeypairSignature(signingPayload, signer.TxnSignature, signer.SigningPubKey)) {
-    throw new Error(`Firma crittografica non valida per ${signer.Account}`)
+    throw new Error(`Invalid cryptographic signature for ${signer.Account}`)
   }
 
   return {
@@ -215,13 +215,13 @@ export class EscrowService {
   }
 
   /**
-   * Deposita il netto dell'ordine in un nuovo oggetto Escrow temporale (Bob -> Vault, FinishAfter = endAt).
+   * Deposits the order net amount into a new time-locked Escrow object (Bob -> Vault, FinishAfter = endAt).
    */
   async deposit(order: RentalPaymentOrder, bobSigner: RoleSigner): Promise<DepositAttemptResult> {
     return this.withOrderActionLock(order.orderId, 'escrow_create', async () => {
       const { checkoutBy, finishAfter } = validateRentalOrder(order)
       if (bobSigner.address !== order.bob) {
-        throw new Error('Firmatario diverso dal Bob indicato nell’ordine')
+        throw new Error('Signer differs from Bob specified in the order')
       }
 
       const existing = this.activeForOrder(order, 'escrow_create')
@@ -255,7 +255,7 @@ export class EscrowService {
   }
 
   /**
-   * Sblocca l'escrow maturato trasferendo il netto al vault dello scenario (EscrowFinish).
+   * Releases the matured escrow, transferring the net amount to the scenario vault (EscrowFinish).
    */
   async releaseToVault(
     order: RentalPaymentOrder,
@@ -296,7 +296,7 @@ export class EscrowService {
     }
     if (escrowStatus.state !== 'releasable' || snapshot.closeTime <= finishAfter) {
       throw new Error(
-        `Escrow non ancora sbloccabile (stato: ${escrowStatus.state}, closeTime: ${snapshot.closeTime}, finishAfter: ${finishAfter})`,
+        `Escrow not yet releasable (state: ${escrowStatus.state}, closeTime: ${snapshot.closeTime}, finishAfter: ${finishAfter})`,
       )
     }
 
@@ -326,8 +326,8 @@ export class EscrowService {
   }
 
   /**
-   * Prepara (o restituisce se gia' attiva) la transazione Payment 2-su-3 dal vault al beneficiario,
-   * chiamando una sola volta client.autofill(tx, 2).
+   * Prepares (or returns if active) the 2-of-3 Payment transaction from the vault to the beneficiary,
+   * calling client.autofill(tx, 2) once.
    */
   async prepareVaultPayout(
     order: RentalPaymentOrder,
@@ -337,7 +337,7 @@ export class EscrowService {
     const { beneficiary, allowedSigners } = resolveVaultSettlement(order, mode)
     const depositOrder = { ...order, createHash: normalizeHash(createHash, 'createHash') }
 
-    // 1. Se esiste gia' un tentativo inviato (pending o validated), riconcilialo prima di qualsiasi nuova firma.
+    // 1. If a submitted attempt already exists (pending or validated), reconcile it before collecting new signatures.
     const existingAttempt = this.activeForOrder(order, 'vault_payout')
     if (existingAttempt) {
       const reconciled = await this.reconcile(existingAttempt.hash, true)
@@ -367,15 +367,15 @@ export class EscrowService {
     const escrowStatus = await this.ledger.verifyEscrowAt(depositOrder, snapshot)
     if (escrowStatus.state !== 'credited_to_vault') {
       throw new Error(
-        `Il netto non risulta ancora accreditato sul vault (stato escrow: ${escrowStatus.state})`,
+        `Net amount is not yet credited to the vault (escrow state: ${escrowStatus.state})`,
       )
     }
 
-    // 2. Riusa la bozza in raccolta firme se ancora valida per lo stesso ordine e modalita'.
+    // 2. Reuse the signature-collection draft if still valid for the same order and mode.
     const existingDraft = this.attempts.getMultisigDraft(order.orderId)
     if (existingDraft && existingDraft.submittedHash === null) {
       if (existingDraft.agreementHash !== order.agreementHash) {
-        throw new Error('agreementHash diverso dalla bozza multifirma registrata')
+        throw new Error('agreementHash differs from recorded multisig draft')
       }
       if (snapshot.index < existingDraft.lastLedger && existingDraft.resolutionMode === mode) {
         return this.draftToProgress(existingDraft, allowedSigners)
@@ -383,7 +383,7 @@ export class EscrowService {
       this.attempts.clearUnsubmittedMultisigDraft(order.orderId)
     }
 
-    // 3. Prepara una sola volta la transazione Payment con SigningPubKey: "" e autofill(tx, 2).
+    // 3. Prepare Payment once with SigningPubKey: "" and autofill(tx, 2).
     const unsigned = buildVaultPayout(order, mode)
     const reserves = await this.ledger.readReserves()
     const prepared = await this.ledger.fill(unsigned, snapshot, {
@@ -402,7 +402,7 @@ export class EscrowService {
       !/^[1-9][0-9]*$/.test(prepared.Fee) ||
       BigInt(prepared.Fee) < minMultisigFee
     ) {
-      throw new Error('Parametri autofill multifirma (Fee >= 3x, Sequence, SigningPubKey) non validi')
+      throw new Error('Invalid multisig autofill parameters (Fee >= 3x, Sequence, SigningPubKey)')
     }
 
     const saved = this.attempts.saveMultisigDraft({
@@ -423,8 +423,8 @@ export class EscrowService {
   }
 
   /**
-   * Registra una firma parziale 2-su-3 sulla transazione Payment preparata per il vault.
-   * Alla seconda firma distinta valida combina i due blob con xrpl.multisign, salva l'hash e invia.
+   * Records a 2-of-3 partial signature on the prepared vault Payment transaction.
+   * On the second valid distinct signature, combines blobs with xrpl.multisign, records hash, and submits.
    */
   async addVaultSignature(
     order: RentalPaymentOrder,
@@ -451,10 +451,10 @@ export class EscrowService {
 
     const draft = this.attempts.getMultisigDraft(order.orderId)
     if (!draft || draft.submittedHash !== null) {
-      throw new Error('Nessuna bozza multifirma attiva per questo ordine: chiamare prepareVaultPayout')
+      throw new Error('No active multisig draft for this order: call prepareVaultPayout')
     }
     if (draft.agreementHash !== order.agreementHash) {
-      throw new Error('agreementHash diverso dalla bozza multifirma registrata')
+      throw new Error('agreementHash differs from recorded multisig draft')
     }
 
     const { beneficiary, allowedSigners } = resolveVaultSettlement(order, draft.resolutionMode)
@@ -462,7 +462,7 @@ export class EscrowService {
     if (
       !matchesOrderMemo(preparedTx.Memos, MEMO_TYPE_VAULT_PAYOUT, order.orderId, order.agreementHash)
     ) {
-      throw new Error('Memo della bozza multifirma incoerente con l’ordine')
+      throw new Error('Multisig draft memo inconsistent with order')
     }
 
     const signerInfo = verifyAndExtractPartialSignature(partialTxBlob, preparedTx, allowedSigners)
@@ -470,10 +470,10 @@ export class EscrowService {
     const snapshot = await this.ledger.snapshot()
     if (snapshot.index >= draft.lastLedger) {
       this.attempts.clearUnsubmittedMultisigDraft(order.orderId)
-      throw new Error('Finestra LastLedgerSequence della bozza multifirma scaduta: ripreparare la transazione')
+      throw new Error('Multisig draft LastLedgerSequence window expired: re-prepare transaction')
     }
 
-    // Idempotenza se lo stesso primo firmatario invia due volte la propria firma.
+    // Idempotent if the same first signer submits their signature twice.
     if (draft.sig1Signer === null) {
       const updated = this.attempts.saveFirstPartialSignature(
         order.orderId,
@@ -488,7 +488,7 @@ export class EscrowService {
     }
 
     if (!draft.sig1Blob) {
-      throw new Error('Stato interno bozza multifirma incoerente')
+      throw new Error('Inconsistent internal multisig draft state')
     }
 
     const combinedBlob = multisign([draft.sig1Blob, partialTxBlob])
@@ -536,7 +536,7 @@ export class EscrowService {
   }
 
   /**
-   * Helper completo per raccogliere in sequenza le due firme tramite RoleSigner e inviare la liquidazione.
+   * Convenience helper to sequentially collect both signatures via RoleSigner and submit settlement.
    */
   async settleVault(
     order: RentalPaymentOrder,
@@ -546,7 +546,7 @@ export class EscrowService {
     secondSigner: RoleSigner,
   ): Promise<VaultPayoutProgress> {
     if (firstSigner.address === secondSigner.address) {
-      throw new Error('Servono due firmatari distinti per la multifirma 2 su 3')
+      throw new Error('Two distinct signers are required for 2-of-3 multisig')
     }
     const initial = await this.prepareVaultPayout(order, createHash, mode)
     if (initial.phase !== 'awaiting_signatures') {
@@ -578,8 +578,8 @@ export class EscrowService {
   }
 
   /**
-   * Rimborsa una sola volta la fee (es. 1 XRP) dall'ente a Bob quando il pass e' stato pagato
-   * ma il deposito escrow risulta sicuramente assente oltre checkoutDeadline.
+   * Refunds the fee once (e.g. 1 XRP) from the authority to Bob when the pass was paid
+   * but the escrow deposit is confirmed absent past checkoutDeadline.
    */
   async refundFee(
     order: RentalPaymentOrder,
@@ -588,7 +588,7 @@ export class EscrowService {
   ): Promise<FeeRefundAttemptResult> {
     const { checkoutBy } = validateRentalOrder(order)
     if (authoritySigner.address !== order.authority) {
-      throw new Error('Firmatario diverso dall’ente competente dell’ordine')
+      throw new Error('Signer differs from competent authority on the order')
     }
 
     const existingRefund = this.activeForOrder(order, 'fee_refund')
@@ -608,15 +608,15 @@ export class EscrowService {
       return reconciled
     }
 
-    // Riconcilia prima eventuali tentativi di deposito rimasti in sospeso.
+    // Reconcile any pending deposit attempts first.
     const depositAttempt = this.activeForOrder(order, 'escrow_create')
     if (depositAttempt) {
       const reconciledDeposit = await this.reconcile(depositAttempt.hash, false)
       if (reconciledDeposit.state === 'pending') {
-        throw new Error('Deposito ancora in verifica sul ledger: vietato rimborsare prematuramente la fee')
+        throw new Error('Escrow deposit still verifying on the ledger: premature fee refund forbidden')
       }
       if (reconciledDeposit.state === 'validated') {
-        throw new Error('Deposito escrow validato: ordine non idoneo al rimborso per mancato deposito')
+        throw new Error('Validated escrow deposit exists: order ineligible for missing-deposit refund')
       }
     }
 
@@ -624,7 +624,7 @@ export class EscrowService {
 
     const snapshot = await this.ledger.snapshot()
     if (snapshot.closeTime <= checkoutBy) {
-      throw new Error('Il termine di checkout non e’ ancora scaduto sul ledger validato')
+      throw new Error('Checkout deadline has not expired on validated ledger yet')
     }
 
     if (order.createHash !== undefined) {
@@ -633,19 +633,19 @@ export class EscrowService {
         snapshot,
       )
       if (status.state === 'pending') {
-        throw new Error('createHash associato all’ordine ancora in verifica')
+        throw new Error('Order createHash is still verifying')
       }
       if (
         status.state === 'locked' ||
         status.state === 'releasable' ||
         status.state === 'credited_to_vault'
       ) {
-        throw new Error('Esiste un deposito valido per l’ordine: rimborso fee non consentito')
+        throw new Error('Valid deposit exists for order: fee refund not permitted')
       }
     }
 
     if (await this.ledger.hasMatchingActiveEscrowFromBob(order, snapshot)) {
-      throw new Error('Rilevato sul ledger un oggetto Escrow attivo di Bob compatibile con l’ordine')
+      throw new Error('Detected an active Escrow object belonging to Bob matching this order on the ledger')
     }
 
     const feeWasCollected = await this.ledger.verifyPassFeeCollected(
@@ -655,7 +655,7 @@ export class EscrowService {
     )
     if (!feeWasCollected) {
       throw new Error(
-        'Nessun incasso fee verificato sul ledger per questo pass: impossibile emettere rimborso',
+        'No verified fee collection found on the ledger for this pass: cannot issue refund',
       )
     }
 
@@ -689,8 +689,8 @@ export class EscrowService {
   }
 
   /**
-   * Riconcilia un tentativo registrato interrogando il ledger validato.
-   * Con retry = true ritenta il broadcast dello stesso tx_blob se ancora entro LastLedgerSequence e deadline.
+   * Reconciles a recorded attempt by querying the validated ledger.
+   * When retry = true, re-broadcasts the same tx_blob if still within LastLedgerSequence and deadline.
    */
   async reconcile(hash: string, retry = false): Promise<AttemptResult> {
     const attempt = this.attempts.get(hash)
@@ -768,7 +768,7 @@ export class EscrowService {
       deliveredDrops !== attempt.amountDrops
     ) {
       throw new Error(
-        `Anomalia delivered_amount su ${attempt.action}: atteso ${attempt.amountDrops}, ricevuto ${deliveredDrops}`,
+        `delivered_amount anomaly on ${attempt.action}: expected ${attempt.amountDrops}, got ${deliveredDrops}`,
       )
     }
 
@@ -786,8 +786,8 @@ export class EscrowService {
   }
 
   /**
-   * Riconcilia tutti i tentativi pendenti di un ordine e comunica a Persona C
-   * se il vault associato all'ordine puo' essere liberato in sicurezza.
+   * Reconciles all pending attempts for an order and tells Person C
+   * whether the associated vault may be safely released.
    */
   async reconcileOrder(orderId: string, retry = false): Promise<{
     readonly attempts: readonly AttemptResult[]
@@ -811,7 +811,7 @@ export class EscrowService {
       (r) => r.action === 'vault_payout' && r.state === 'validated',
     )
 
-    // Se il deposito e' stato validato, il vault non puo' essere liberato finche' vault_payout non e' validato.
+    // If deposit was validated, the vault cannot be released until vault_payout is validated.
     const canReleaseVault =
       !hasPending && !hasActiveUnsubmittedDraft && (!depositValidated || payoutValidated)
 
@@ -825,7 +825,7 @@ export class EscrowService {
   private activeForOrder(order: RentalPaymentOrder, action: PaymentAction): Attempt | undefined {
     const existing = this.attempts.active(order.orderId, action)
     if (existing && existing.agreementHash !== order.agreementHash) {
-      throw new Error('agreementHash diverso dal tentativo gia’ registrato per l’ordine')
+      throw new Error('agreementHash differs from attempt already recorded for order')
     }
     return existing
   }
@@ -836,7 +836,7 @@ export class EscrowService {
     const updated = await this.reconcile(pending.hash, true)
     if (updated.state === 'pending') {
       throw new Error(
-        `Il wallet ${account} ha ancora la transazione ${pending.hash} in verifica sul ledger`,
+        `Wallet ${account} still has transaction ${pending.hash} verifying on the ledger`,
       )
     }
   }
@@ -920,10 +920,10 @@ export class EscrowService {
     summary: Readonly<Record<string, string | number>>,
   ): Promise<AttemptResult> {
     if (signer.address !== transaction.Account) {
-      throw new Error(`Firmatario ${signer.address} diverso da Account ${transaction.Account}`)
+      throw new Error(`Signer ${signer.address} differs from Account ${transaction.Account}`)
     }
     if (!this.withinDeadline(snapshot, broadcastUntil, action)) {
-      throw new Error('Finestra temporale di firma scaduta')
+      throw new Error('Signing time window expired')
     }
 
     const prepared = await this.ledger.fill(transaction as SubmittableTransaction, snapshot, {
@@ -939,7 +939,7 @@ export class EscrowService {
       typeof Fee !== 'string' ||
       !/^[1-9][0-9]*$/.test(Fee)
     ) {
-      throw new Error('Parametri autofill XRPL non validi')
+      throw new Error('Invalid XRPL autofill parameters')
     }
 
     const signed = await signer.signSingle(prepared, {
@@ -955,7 +955,7 @@ export class EscrowService {
       latest.index < snapshot.index ||
       !this.withinDeadline(latest, broadcastUntil, action)
     ) {
-      throw new Error('Finestra di firma scaduta prima dell’invio al ledger')
+      throw new Error('Signing window expired before ledger submission')
     }
 
     const destination =

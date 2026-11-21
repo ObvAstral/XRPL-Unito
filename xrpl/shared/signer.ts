@@ -22,8 +22,8 @@ export interface SignedTransactionBlob {
 }
 
 /**
- * Interfaccia consegnata da Persona A (o implementata localmente coi wallet di sviluppo)
- * per richiedere firme singole oppure firme parziali destinate alla multifirma 2 su 3 del vault.
+ * Interface provided by Person A (or implemented locally with dev wallets)
+ * to request single signatures or partial signatures for 2-of-3 vault multisig.
  */
 export interface RoleSigner {
   readonly address: string
@@ -47,20 +47,20 @@ export function createWalletSigner(
     address: wallet.classicAddress,
     async signSingle(tx, context) {
       if (tx.Account !== wallet.classicAddress) {
-        throw new Error(`Firmatario ${wallet.classicAddress} diverso da Account ${tx.Account}`)
+        throw new Error(`Signer ${wallet.classicAddress} differs from Account ${tx.Account}`)
       }
       if (!(await confirm(context))) {
-        throw new Error('Firma rifiutata dall’utente')
+        throw new Error('Signature rejected by user')
       }
       const { hash, tx_blob } = wallet.sign(tx, false)
       return { hash: hash.toUpperCase(), tx_blob, signerAddress: wallet.classicAddress }
     },
     async signForMultisig(tx, context) {
       if (tx.SigningPubKey !== '') {
-        throw new Error('La transazione multifirma deve avere SigningPubKey vuota')
+        throw new Error('Multisig transaction must have empty SigningPubKey')
       }
       if (!(await confirm(context))) {
-        throw new Error('Firma parziale rifiutata dall’utente')
+        throw new Error('Partial signature rejected by user')
       }
       const { hash, tx_blob } = wallet.sign(tx, true)
       return { hash: hash.toUpperCase(), tx_blob, signerAddress: wallet.classicAddress }

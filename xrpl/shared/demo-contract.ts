@@ -36,33 +36,33 @@ export interface SimulatedPresetDescriptor {
 export const SIMULATED_PRESETS: readonly SimulatedPresetDescriptor[] = [
   {
     id: 'initial_active_license',
-    label: '0 · Prima dell’affitto',
-    description: 'Titolo principale attivo per Alice, nessun ordine aperto e nessun accesso per Bob.',
+    label: '0 · Before rental',
+    description: 'Main title active for Alice, no open orders, and no access for Bob.',
   },
   {
     id: 'pending_authority',
-    label: '1 · In attesa dell’ente',
-    description: 'Proposta pubblicata da Alice e accettata da Bob; l’ente deve ancora decidere.',
+    label: '1 · Awaiting authority',
+    description: 'Proposal published by Alice and accepted by Bob; authority has not decided yet.',
   },
   {
     id: 'pass_delivered_missing_deposit',
-    label: '2 · Pass consegnato, deposito mancante',
-    description: 'Pass NFT consegnato a Bob con 1 XRP all’ente; deposito escrow da 9 XRP mancante.',
+    label: '2 · Pass delivered, deposit missing',
+    description: 'NFT pass delivered to Bob with 1 XRP to authority; 9 XRP escrow deposit missing.',
   },
   {
     id: 'active_rental',
-    label: '3 · Affitto attivo',
-    description: 'Pass e deposito da 9 XRP validati; periodo attivo con diritto esclusivo a Bob e sospensione di Alice.',
+    label: '3 · Active rental',
+    description: 'Pass and 9 XRP deposit validated; active period with exclusive right for Bob and Alice suspended.',
   },
   {
     id: 'expired_rental',
-    label: '4 · Affitto scaduto',
-    description: 'Periodo concluso: Bob perde l’accesso, Alice lo recupera e il saldo matura nel vault 2-su-3.',
+    label: '4 · Expired rental',
+    description: 'Period ended: Bob loses access, Alice recovers it, and balance matures in the 2-of-3 vault.',
   },
   {
     id: 'expired_rental_and_license',
-    label: '5 · Affitto e licenza scaduti',
-    description: 'Il titolo principale scade insieme all’affitto: né Alice né Bob possono accedere.',
+    label: '5 · Expired rental and license',
+    description: 'Main title expires together with the rental: neither Alice nor Bob can access.',
   },
 ] as const
 
@@ -207,7 +207,7 @@ export function formatUtcSecond(date: Date | number): string {
 export function formatTorinoDateTime(utcIso: string): string {
   const parsed = new Date(utcIso)
   if (!Number.isFinite(parsed.valueOf())) return utcIso
-  const formatted = new Intl.DateTimeFormat('it-IT', {
+  const formatted = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Rome',
     year: 'numeric',
     month: '2-digit',

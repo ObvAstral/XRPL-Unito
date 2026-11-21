@@ -424,7 +424,7 @@ export class AppStore {
 
       if (!existing) {
         if (input.revision !== 1) {
-          throw new Error('La prima revisione di un annuncio deve avere revision = 1.')
+          throw new Error('The first revision of a listing must have revision = 1.')
         }
         this.db
           .prepare(
@@ -436,11 +436,11 @@ export class AppStore {
           .run(input.listingId, input.resourceId, input.alice, input.revision, input.nowUtc, input.nowUtc)
       } else {
         if (existing.resourceId !== input.resourceId || existing.alice !== input.alice) {
-          throw new Error('Risorsa o titolare non coerenti con l’annuncio esistente.')
+          throw new Error('Resource or owner does not match the existing listing.')
         }
         if (input.revision !== existing.currentRevision + 1) {
           throw new Error(
-            `Revisione attesa ${existing.currentRevision + 1}, ricevuta ${input.revision}.`,
+            `Expected revision ${existing.currentRevision + 1}, received ${input.revision}.`,
           )
         }
         this.db
@@ -526,8 +526,8 @@ export class AppStore {
   }
 
   /**
-   * Unica transazione SQLite che controlla sovrapposizione sul calendario e unicità del vault
-   * prima di aprire l'ordine.
+   * Single SQLite transaction that checks calendar overlap and vault uniqueness
+   * before opening an order.
    */
   reserveOrderAtomically(input: {
     readonly orderId: string
@@ -557,7 +557,7 @@ export class AppStore {
         .prepare('SELECT orderId FROM orders WHERE orderId = ?')
         .get(input.orderId) as { orderId: string } | undefined
       if (dupOrder) {
-        throw new ConflictError('ORDER_EXISTS', `Ordine ${input.orderId} già registrato.`)
+        throw new ConflictError('ORDER_EXISTS', `Order ${input.orderId} is already registered.`)
       }
 
       const overlapping = this.db
@@ -572,7 +572,7 @@ export class AppStore {
       if (overlapping) {
         throw new ConflictError(
           'PERIOD_ALREADY_RESERVED',
-          `Periodo già riservato dall’ordine ${overlapping.orderId}.`,
+          `Period already reserved by order ${overlapping.orderId}.`,
         )
       }
 
@@ -582,7 +582,7 @@ export class AppStore {
       if (busyVault) {
         throw new ConflictError(
           'VAULT_BUSY',
-          `Vault ${input.vault} già impegnato dall’ordine aperto ${busyVault.orderId}.`,
+          `Vault ${input.vault} is already locked by open order ${busyVault.orderId}.`,
         )
       }
 
@@ -630,7 +630,7 @@ export class AppStore {
       if (msg.includes('one_open_order_per_vault') || msg.includes('UNIQUE constraint')) {
         throw new ConflictError(
           'VAULT_BUSY',
-          `Vault ${input.vault} già impegnato da un altro ordine aperto.`,
+          `Vault ${input.vault} is already locked by another open order.`,
         )
       }
       throw error

@@ -74,12 +74,12 @@ export interface SetupWalletsOptions {
 function createKeyEntry(overrideAddress?: string): StoredKeyEntry {
   if (overrideAddress !== undefined) {
     if (!isValidClassicAddress(overrideAddress)) {
-      throw new Error(`Indirizzo override XRPL non valido: ${overrideAddress}`)
+      throw new Error(`Invalid override XRPL address: ${overrideAddress}`)
     }
     return { address: overrideAddress, seed: null }
   }
   const generated = Wallet.generate()
-  if (!generated.seed) throw new Error('Generazione seed wallet XRPL fallita')
+  if (!generated.seed) throw new Error('XRPL wallet seed generation failed')
   return { address: generated.classicAddress, seed: generated.seed }
 }
 
@@ -88,7 +88,7 @@ function applyOverride(existing: StoredKeyEntry, overrideAddress?: string): Stor
     return existing
   }
   if (!isValidClassicAddress(overrideAddress)) {
-    throw new Error(`Indirizzo override XRPL non valido: ${overrideAddress}`)
+    throw new Error(`Invalid override XRPL address: ${overrideAddress}`)
   }
   return { address: overrideAddress, seed: null }
 }
@@ -109,7 +109,7 @@ export function loadOrInitSecrets(
   if (existsSync(secretsPath)) {
     const parsed = JSON.parse(readFileSync(secretsPath, 'utf8')) as DevSecretsFile
     if (parsed.version !== 2 || parsed.network !== 'testnet') {
-      throw new Error('Formato dev-secrets.json incompatibile con la v2')
+      throw new Error('Incompatible dev-secrets.json format (v2 expected)')
     }
     const updated: DevSecretsFile = {
       version: 2,
@@ -160,11 +160,11 @@ function assertDistinctSetupAddresses(secrets: DevSecretsFile): void {
     secrets.vaultBootstrap.billboard.address,
   ]
   if (!all.every((addr) => isValidClassicAddress(addr))) {
-    throw new Error('Uno o piu’ indirizzi nella configurazione di setup non sono validi')
+    throw new Error('One or more addresses in setup configuration are invalid')
   }
   if (new Set(all).size !== all.length) {
     throw new Error(
-      'Alice, Bob, fornitore CAD, Comune, operatore e i due vault devono avere tutti indirizzi distinti',
+      'Alice, Bob, CAD provider, Municipality, operator, and both vaults must all have distinct addresses',
     )
   }
 }
@@ -172,12 +172,12 @@ function assertDistinctSetupAddresses(secrets: DevSecretsFile): void {
 function walletFromStored(entry: StoredKeyEntry, label: string): Wallet {
   if (!entry.seed) {
     throw new Error(
-      `Seed privata assente per ${label} (${entry.address}): impossibile firmare la configurazione iniziale`,
+      `Missing private seed for ${label} (${entry.address}): cannot sign initial configuration`,
     )
   }
   const wallet = Wallet.fromSeed(entry.seed)
   if (wallet.classicAddress !== entry.address) {
-    throw new Error(`La seed salvata per ${label} non corrisponde all’indirizzo ${entry.address}`)
+    throw new Error(`Saved seed for ${label} does not match address ${entry.address}`)
   }
   return wallet
 }
@@ -195,7 +195,7 @@ export function createTestnetFaucetFunder(client: Client): FaucetFunder {
       signal: AbortSignal.timeout(15_000),
     })
     if (!response.ok) {
-      throw new Error(`Faucet Testnet HTTP ${response.status} per ${address}`)
+      throw new Error(`Testnet Faucet HTTP ${response.status} for ${address}`)
     }
   }
 }
@@ -231,11 +231,11 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
       current = await service.reconcile(hash, i === 0)
     }
     if (current.state === 'pending') {
-      throw new Error(`Transazione di setup ${hash} ancora in verifica sul ledger: riprova tra poco`)
+      throw new Error(`Setup transaction ${hash} still verifying on ledger: retry shortly`)
     }
     if (current.state !== 'validated') {
       throw new Error(
-        `Transazione di setup ${hash} non validata (stato: ${current.state}, codice: ${current.result ?? 'ignoto'})`,
+        `Setup transaction ${hash} not validated (state: ${current.state}, code: ${current.result ?? 'unknown'})`,
       )
     }
     return current
@@ -257,10 +257,10 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
       if (updated !== null && updated >= required) return
       await wait(pollIntervalMs)
     }
-    throw new Error(`Accredito faucet non ancora visibile sul ledger validato per ${entry.address}`)
+    throw new Error(`Faucet credit not yet visible on validated ledger for ${entry.address}`)
   }
 
-  // 1. Finanziamento idempotente dei partecipanti e dell'account operativo (solo se sotto soglia).
+  // 1. Idempotent funding of participants and operational account (only if below threshold).
   for (const role of [
     secrets.participants.alice,
     secrets.participants.bob,
@@ -271,7 +271,7 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
     await ensureParticipantFunded(role)
   }
 
-  // 2. Setup idempotente e riprendibile dei due vault distinti (CAD e Cartellone).
+  // 2. Idempotent and resumable setup of both distinct vaults (CAD and Billboard).
   const configureVault = async (
     scenario: VaultScenario,
     vaultEntry: StoredKeyEntry,
@@ -281,7 +281,7 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
     const setupOrderId = `setup:${scenario}`
     const orderedSigners = canonicalSignerAddresses(expectedSigners)
 
-    // Riconcilia prima eventuali tentativi rimasti in sospeso da un avvio precedente.
+    // Reconcile any in-flight attempts from a previous run first.
     for (const action of ['vault_signer_list', 'vault_disable_master'] as const) {
       const active = attempts.active(setupOrderId, action)
       if (active?.state === 'pending') {
@@ -301,7 +301,7 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
     if (inspection.state === 'mismatch') {
       throw new VaultConfigMismatchError(
         vaultEntry.address,
-        inspection.reason ?? 'Discrepanza configurazione vault',
+        inspection.reason ?? 'Vault configuration mismatch',
       )
     }
 
@@ -333,7 +333,7 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
         if (inspection.state === 'mismatch') {
           throw new VaultConfigMismatchError(
             vaultEntry.address,
-            inspection.reason ?? 'Discrepanza configurazione vault',
+            inspection.reason ?? 'Vault configuration mismatch',
           )
         }
         if (inspection.state !== 'not_found' && inspection.state !== 'needs_funding') {
@@ -343,7 +343,7 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
         await wait(pollIntervalMs)
       }
       if (!funded) {
-        throw new Error(`Fondi insufficienti o accredito non validato per il vault ${vaultEntry.address}`)
+        throw new Error(`Insufficient funds or unvalidated credit for vault ${vaultEntry.address}`)
       }
     }
 
@@ -364,7 +364,7 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
       )
       await settleAttempt(submitted.hash)
 
-      // Verifica sul ledger validato che SignerList (3 firmatari peso 1, Quorum 2) sia attiva PRIMA di disabilitare la master key.
+      // Verify on validated ledger that SignerList (3 signers weight 1, Quorum 2) is active BEFORE disabling master key.
       snapshot = await ledger.snapshot()
       inspection = await ledger.inspectVaultAccount(
         vaultEntry.address,
@@ -376,18 +376,18 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
       if (inspection.state === 'mismatch') {
         throw new VaultConfigMismatchError(
           vaultEntry.address,
-          inspection.reason ?? 'SignerList post-setup incoerente',
+          inspection.reason ?? 'Inconsistent post-setup SignerList',
         )
       }
       if (!inspection.signerListConfigured) {
-        throw new Error(`SignerList non ancora attiva sul ledger per il vault ${vaultEntry.address}`)
+        throw new Error(`SignerList not yet active on ledger for vault ${vaultEntry.address}`)
       }
     }
 
     if (inspection.state === 'needs_disable_master') {
       if (!inspection.signerListConfigured) {
         throw new Error(
-          `Rifiuto di disabilitare la master key su ${vaultEntry.address} senza SignerList validata`,
+          `Refusing to disable master key on ${vaultEntry.address} without validated SignerList`,
         )
       }
       const masterWallet = walletFromStored(vaultEntry, `vault ${scenario}`)
@@ -419,12 +419,12 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
     if (inspection.state === 'mismatch') {
       throw new VaultConfigMismatchError(
         vaultEntry.address,
-        inspection.reason ?? 'Verifica finale vault fallita',
+        inspection.reason ?? 'Final vault verification failed',
       )
     }
     if (inspection.state !== 'ready') {
       throw new Error(
-        `Configurazione vault ${scenario} (${vaultEntry.address}) incompleta: stato ${inspection.state}`,
+        `Vault ${scenario} (${vaultEntry.address}) setup incomplete: state ${inspection.state}`,
       )
     }
 
@@ -460,7 +460,7 @@ export async function runSetupWallets(options: SetupWalletsOptions): Promise<{
     reserves,
   )
 
-  // 3. Controllo emendamento NFTokenMintOffer sullo snapshot validato di Testnet.
+  // 3. Check NFTokenMintOffer amendment on the validated Testnet snapshot.
   const finalSnapshot = await ledger.snapshot()
   const nftokenMintOfferEnabled = await ledger.isAmendmentEnabled(
     finalSnapshot,

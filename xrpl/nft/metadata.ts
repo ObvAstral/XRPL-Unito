@@ -4,13 +4,13 @@ import type { Fields } from './pass.js'
 
 function tokenIds(fields: unknown): string[] {
   const rows = record(fields).NFTokens
-  if (!Array.isArray(rows)) throw new Error('Elenco NFT mancante nei metadati.')
+  if (!Array.isArray(rows)) throw new Error('Missing NFT list in metadata.')
   return rows.map((row) => readHash(record(record(row).NFToken).NFTokenID))
 }
 
 export function mintedNftId(meta: Fields): string {
   if (meta.nftoken_id !== undefined) return readHash(meta.nftoken_id)
-  if (!Array.isArray(meta.AffectedNodes)) throw new Error('Metadati NFT incompleti.')
+  if (!Array.isArray(meta.AffectedNodes)) throw new Error('Incomplete NFT metadata.')
 
   const before = new Set<string>()
   const after = new Set<string>()
@@ -30,12 +30,12 @@ export function mintedNftId(meta: Fields): string {
     }
   }
   const [minted, ...other] = [...after].filter((id) => !before.has(id))
-  if (!minted || other.length !== 0) throw new Error('Impossibile ricavare un solo NFT dalla transazione validata.')
+  if (!minted || other.length !== 0) throw new Error('Unable to extract a single NFT ID from validated transaction.')
   return minted
 }
 
 export function createdOfferId(meta: Fields, transaction: NFTokenCreateOffer): string {
-  if (!Array.isArray(meta.AffectedNodes)) throw new Error('Metadati dell’offerta incompleti.')
+  if (!Array.isArray(meta.AffectedNodes)) throw new Error('Incomplete offer metadata.')
   const ids = []
   for (const entry of meta.AffectedNodes) {
     const created = record(entry).CreatedNode
@@ -53,7 +53,7 @@ export function createdOfferId(meta: Fields, transaction: NFTokenCreateOffer): s
   }
   const [id, ...other] = ids
   if (!id || other.length !== 0 || (meta.offer_id !== undefined && readHash(meta.offer_id) !== id)) {
-    throw new Error('Impossibile ricavare un solo ID offerta dalla transazione validata.')
+    throw new Error('Unable to extract a single offer ID from validated transaction.')
   }
   return id
 }

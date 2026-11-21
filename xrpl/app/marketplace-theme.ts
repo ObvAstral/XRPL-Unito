@@ -3,7 +3,7 @@ export const demoThemeTokens = String.raw`
 
   :root {
     color-scheme: dark;
-    /* Color Palette — Estilo Deep Learning High-Tech */
+    /* Color Palette — Deep Tech High-Contrast */
     --bg-primary: #1A1A1A;
     --bg-elevated: #222222;
     --surface: #2A2A2A;

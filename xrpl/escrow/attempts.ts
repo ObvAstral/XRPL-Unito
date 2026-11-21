@@ -141,7 +141,7 @@ export class AttemptStore {
 
   get(hash: string): Attempt {
     const row = this.db.prepare('SELECT * FROM attempts WHERE hash = ?').get(hash.toUpperCase())
-    if (!row) throw new Error(`Tentativo XRPL inesistente: ${hash}`)
+    if (!row) throw new Error(`Unknown XRPL attempt: ${hash}`)
     return row as unknown as Attempt
   }
 
@@ -175,7 +175,7 @@ export class AttemptStore {
     if (inserted.changes === 1) return this.get(normalizedHash)
     const existing = this.active(attempt.orderId, attempt.action)
     if (existing?.agreementHash === attempt.agreementHash) return existing
-    throw new Error('Esiste gia’ un tentativo attivo per l’ordine o per il wallet')
+    throw new Error('An active attempt already exists for this order or wallet')
   }
 
   complete(
@@ -263,7 +263,7 @@ export class AttemptStore {
         draft.lastLedger,
       )
     const saved = this.getMultisigDraft(draft.orderId)
-    if (!saved) throw new Error('Impossibile salvare la bozza multifirma del vault')
+    if (!saved) throw new Error('Unable to save vault multisig draft')
     return saved
   }
 
@@ -290,7 +290,7 @@ export class AttemptStore {
       )
       .run(signer, blob, orderId)
     const updated = this.getMultisigDraft(orderId)
-    if (!updated) throw new Error('Bozza multifirma inesistente')
+    if (!updated) throw new Error('Multisig draft not found')
     return updated
   }
 
@@ -304,7 +304,7 @@ export class AttemptStore {
     this.db.exec('BEGIN IMMEDIATE')
     try {
       const current = this.getMultisigDraft(orderId)
-      if (!current) throw new Error('Bozza multifirma inesistente')
+      if (!current) throw new Error('Multisig draft not found')
       if (current.submittedHash !== null) {
         this.db.exec('COMMIT')
         return this.get(current.submittedHash)

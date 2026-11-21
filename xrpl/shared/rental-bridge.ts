@@ -18,9 +18,9 @@ export interface PassLedgerRefs {
 }
 
 /**
- * Traduce l'accordo verificato da Persona A nell'ordine di pagamento di Persona B.
- * `agreementHash` e' il digest dell'ordine firmato (lo stesso della URI del pass).
- * `scenario` non sta nell'accordo: lo sceglie il backend insieme al vault.
+ * Translates the agreement verified by Person A into Person B's payment order.
+ * `agreementHash` is the digest of the signed order (the same as in the pass URI).
+ * `scenario` is not inside the agreement: the backend selects it together with the vault.
  */
 export function toPaymentOrder(
   rental: VerifiedRental,
@@ -50,7 +50,7 @@ export function toPaymentOrder(
   }
 }
 
-/** Adatta il LocalSigner di Persona A al RoleSigner che l'escrow invoca. */
+/** Adapts Person A's LocalSigner to the RoleSigner interface invoked by escrow. */
 export function adaptLocalSigner(
   signer: LocalSigner,
   confirm: ConfirmPrompt = async () => true,
@@ -59,17 +59,17 @@ export function adaptLocalSigner(
     address: signer.classicAddress,
     async signSingle(tx, context) {
       if (tx.Account !== signer.classicAddress) {
-        throw new Error(`Firmatario ${signer.classicAddress} diverso da Account ${tx.Account}`)
+        throw new Error(`Signer ${signer.classicAddress} differs from Account ${tx.Account}`)
       }
-      if (!(await confirm(context))) throw new Error('Firma rifiutata dall’utente')
+      if (!(await confirm(context))) throw new Error('Signature rejected by user')
       const { hash, tx_blob } = signer.sign(tx)
       return { hash: hash.toUpperCase(), tx_blob, signerAddress: signer.classicAddress }
     },
     async signForMultisig(tx, context) {
       if (tx.SigningPubKey !== '') {
-        throw new Error('La transazione multifirma deve avere SigningPubKey vuota')
+        throw new Error('Multisig transaction must have empty SigningPubKey')
       }
-      if (!(await confirm(context))) throw new Error('Firma parziale rifiutata dall’utente')
+      if (!(await confirm(context))) throw new Error('Partial signature rejected by user')
       const { hash, tx_blob } = signer.signPartial(tx)
       return { hash: hash.toUpperCase(), tx_blob, signerAddress: signer.classicAddress }
     },
@@ -77,8 +77,8 @@ export function adaptLocalSigner(
 }
 
 /**
- * Vocabolario della revoca (A): solo `missing` autorizza il burn.
- * `mismatch` resta `present`: c'e' un oggetto che non coincide coi termini, non si brucia.
+ * Revocation vocabulary (A): only `missing` authorizes the burn.
+ * `mismatch` remains `present`: an object exists that does not match the terms, do not burn.
  */
 export function escrowStateForRevoke(
   state: OrderEscrowStatus['state'],
@@ -89,9 +89,9 @@ export function escrowStateForRevoke(
 }
 
 /**
- * Stato deposito da passare a `RentalNfts.revokePass`, sullo snapshot gia' usato per il pass.
- * Senza `createHash` cerca un Escrow attivo di Bob. `attemptsPending` blocca il burn finche'
- * l'AttemptStore non ha riconciliato l'invio.
+ * Deposit state to pass to `RentalNfts.revokePass` on the same snapshot used for the pass.
+ * Without `createHash`, looks for an active Escrow from Bob. `attemptsPending` blocks burning
+ * until AttemptStore has reconciled the submission.
  */
 export async function rentalDepositState(
   ledger: EscrowLedger,

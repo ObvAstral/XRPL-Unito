@@ -21,7 +21,7 @@ export type OfferIds = { nftId: string; offerId: string }
 function validatedRpc(rpc: LedgerRequest): LedgerRequest {
   return async (command, fields) => {
     const result = await rpc(command, fields)
-    if (fields?.ledger_hash && typeof result.validated !== 'boolean') throw new Error('Ledger non validato.')
+    if (fields?.ledger_hash && typeof result.validated !== 'boolean') throw new Error('Unvalidated ledger.')
     return result
   }
 }
@@ -95,7 +95,7 @@ function matchesOffer(offer: Fields, asset: Asset, nftId: string) {
 }
 
 function verifySaleMetadata(meta: Fields, asset: Asset, ids: OfferIds) {
-  if (!Array.isArray(meta.AffectedNodes)) throw new Error('Metadati di accettazione mancanti.')
+  if (!Array.isArray(meta.AffectedNodes)) throw new Error('Missing acceptance metadata.')
   let removedOffer = false
   let credited = asset.amount === '0'
   for (const entry of meta.AffectedNodes) {
@@ -117,7 +117,7 @@ function verifySaleMetadata(meta: Fields, asset: Asset, ids: OfferIds) {
       }
     }
   }
-  if (!removedOffer || !credited) throw new Error('I metadati validati non confermano l’offerta e la fee attese.')
+  if (!removedOffer || !credited) throw new Error('Validated metadata does not confirm the expected offer and fee.')
 }
 
 export class RentalNfts {
@@ -132,10 +132,10 @@ export class RentalNfts {
     const result = await readAtSnapshot(this.rpc, 'ledger_entry', { index: amendmentsId }, hash)
     const node = record(result.node)
     if (readHash(result.index ?? node.index) !== amendmentsId || node.LedgerEntryType !== 'Amendments') {
-      throw new Error('Stato degli emendamenti non verificabile.')
+      throw new Error('Unable to verify amendments state.')
     }
     const ids = node.Amendments ?? []
-    if (!Array.isArray(ids)) throw new Error('Stato degli emendamenti non verificabile.')
+    if (!Array.isArray(ids)) throw new Error('Unable to verify amendments state.')
     return ids.map(readHash).includes(mintOfferId)
   }
 
@@ -150,7 +150,7 @@ export class RentalNfts {
     const result = await this.issue('pass:' + rental.agreementHash, passAsset(rental), signing, rental, async (snapshot) => {
       checkOfferWindow(rental.order.fundBy, snapshot)
       if (!await owns(this.rpc, titleAsset(rental.title), proposal.alice, proposal.titleNftId, snapshot.hash)) {
-        throw new Error('Alice deve possedere il titolo registrato al momento dell’emissione.')
+        throw new Error('Alice must own the registered title at issuance time.')
       }
     })
     return { agreementHash: rental.agreementHash, ...result }
@@ -178,13 +178,13 @@ export class RentalNfts {
     this.requireSigner(signing, asset.issuer)
     const stored = this.journal.read(JSON.stringify([asset.issuer, key, 'NFTokenBurn']))
     const readHolder = async (snapshot: Snapshot) => {
-      if (snapshot.closeTime <= rippleTime(rental.order.fundBy)) throw new Error('Il termine per il deposito è ancora aperto.')
+      if (snapshot.closeTime <= rippleTime(rental.order.fundBy)) throw new Error('Deposit deadline is still open.')
       if (await depositState(rental, snapshot) !== 'missing') {
-        throw new Error('Il deposito deve risultare assente e riconciliato sul ledger validato.')
+        throw new Error('Deposit must be absent and reconciled on the validated ledger.')
       }
       if (await owns(this.rpc, asset, asset.recipient, id, snapshot.hash)) return asset.recipient
       if (await owns(this.rpc, asset, asset.issuer, id, snapshot.hash)) return asset.issuer
-      throw new Error('Il pass atteso non risulta presso Bob o l’ente.')
+      throw new Error('Expected pass is not held by Bob or the authority.')
     }
     const previous = stored && decode(stored.attempt.blob)
     const holder = previous ? (previous.Owner ?? asset.issuer) : await readHolder(await recentSnapshot(this.rpc))
@@ -194,13 +194,13 @@ export class RentalNfts {
       ...(feeRefundDue && { Owner: asset.recipient }),
     }
     const result = await this.run(key, tx, signing, { ...rental, feeRefundDue }, async (snapshot) => {
-      if (await readHolder(snapshot) !== holder) throw new Error('Il possessore del pass è cambiato.')
+      if (await readHolder(snapshot) !== holder) throw new Error('Pass holder has changed.')
     })
     return { ...result, agreementHash: rental.agreementHash, nftId: id, ...(result.status === 'validated' && { feeRefundDue }) }
   }
 
   private requireSigner(signing: RentalSigning, address: string) {
-    if (signing.signer.classicAddress !== address) throw new Error('Firmatario inatteso per questa operazione.')
+    if (signing.signer.classicAddress !== address) throw new Error('Unexpected signer for this operation.')
   }
 
   private run(
@@ -238,7 +238,7 @@ export class RentalNfts {
     const outcome = await this.run(key, offer, signing, context, async (snapshot) => {
       if (preflight) await preflight(snapshot)
       if (!await owns(this.rpc, asset, asset.issuer, nftId, snapshot.hash)) {
-        throw new Error('L’ente deve possedere l’NFT appena emesso.')
+        throw new Error('Authority must own the newly minted NFT.')
       }
     })
     const issued = { stage: 'offer' as const, nftId, mintReceipt: mint.receipt }
@@ -262,7 +262,7 @@ export class RentalNfts {
       if (offer.LedgerEntryType !== 'NFTokenOffer' || readHash(result.index ?? offer.index) !== ids.offerId
         || !matchesOffer(offer, asset, ids.nftId)
         || !await owns(this.rpc, asset, asset.issuer, ids.nftId, snapshot.hash)) {
-        throw new Error('Il token o l’offerta non corrispondono ai termini firmati.')
+        throw new Error('Token or offer does not match signed terms.')
       }
     })
     if (outcome.status !== 'validated') return outcome

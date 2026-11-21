@@ -13,7 +13,7 @@ import { RentalPlatformService, type LocalDemoRole, type OrderView, type Resourc
 import { SimulatedXrplNode, createSimulatedRuntime } from './xrpl-runtime.js'
 
 function createMinimalValidJpeg(): Buffer {
-  // JPEG baseline 1x1 valido: SOI, APP0, DQT, SOF0 (1x1, 1 comp), DHT, SOS, data, EOI.
+  // Valid 1x1 baseline JPEG: SOI, APP0, DQT, SOF0 (1x1, 1 comp), DHT, SOS, data, EOI.
   return Buffer.from([
     0xff, 0xd8,
     0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
@@ -76,7 +76,7 @@ async function createTestHarness(
     try {
       data = text ? JSON.parse(text) : null
     } catch {
-      // testo o HTML
+      // text or HTML
     }
     return { status: res.status, data: data as T }
   }
@@ -187,14 +187,14 @@ async function createTestHarness(
   }
 }
 
-test('login monouso, 4 risposte simulate e ordine CAD di esempio 10 / 1 / 9 XRP', async (t) => {
+test('one-time login, 4 simulated responses, and sample 10 / 1 / 9 XRP CAD order', async (t) => {
   const h = await createTestHarness(t)
 
-  // Sessione richiesta su endpoint protetti.
+  // Session required on protected endpoints.
   const unauth = await h.api('/api/cad/cad/progetto')
   assert.equal(unauth.status, 401)
 
-  // Verifica consumo monouso e rifiuto di sessionRef errato o firma falsa.
+  // Verify single-use consumption and rejection of wrong sessionRef or spoofed signature.
   const ch = await h.api<{ sessionRef: string; challenge: { id: string; domain: string; network: 'testnet'; expiresAt: number; sessionRef: string } }>(
     '/api/wallet/challenge',
     { method: 'POST', body: {} },
@@ -215,7 +215,7 @@ test('login monouso, 4 risposte simulate e ordine CAD di esempio 10 / 1 / 9 XRP'
   })
   assert.equal(okLogin.status, 200)
 
-  // Riuso della stessa challenge deve fallire.
+  // Reusing the same challenge must fail.
   const replay = await h.api('/api/wallet/session', {
     method: 'POST',
     sessionRef: ch.data.sessionRef,
@@ -226,7 +226,7 @@ test('login monouso, 4 risposte simulate e ordine CAD di esempio 10 / 1 / 9 XRP'
   const aliceRef = await h.loginRole('alice')
   const bobRef = await h.loginRole('bob')
 
-  // Esempio 10 / 1 / 9 XRP per il primo scambio tra A, B e C.
+  // Sample 10 / 1 / 9 XRP exchange across A, B, and C.
   const sample = await h.api<SampleOrderExchange>('/api/scambio/esempio-cad')
   assert.equal(sample.status, 200)
   assert.equal(sample.data.split.grossDrops, '10000000')
@@ -236,7 +236,7 @@ test('login monouso, 4 risposte simulate e ordine CAD di esempio 10 / 1 / 9 XRP'
   assert.ok(sample.data.titleNftId)
   assert.equal(sample.data.vault.signers.length, 3)
 
-  // Le 4 risposte simulate richieste + stato iniziale e licenza scaduta.
+  // The 4 required simulated responses + initial state and expired license.
   await h.api('/api/simulazione/preset', { method: 'POST', body: { preset: 'pending_authority' } })
   const bobWait = await h.api<AccessDecisionView>('/api/risorse/cad/accesso', { sessionRef: bobRef })
   assert.equal(bobWait.data.code, 'WAIT_AUTHORITY')
@@ -251,7 +251,7 @@ test('login monouso, 4 risposte simulate e ordine CAD di esempio 10 / 1 / 9 XRP'
   })
   const bobNoDep = await h.api<AccessDecisionView>('/api/risorse/cad/accesso', { sessionRef: bobRef })
   assert.equal(bobNoDep.data.code, 'PASS_DELIVERED_NO_DEPOSIT')
-  assert.match(bobNoDep.data.headline, /Completa il deposito/)
+  assert.match(bobNoDep.data.headline, /Complete the deposit/)
 
   await h.api('/api/simulazione/preset', { method: 'POST', body: { preset: 'active_rental' } })
   const bobActive = await h.api<AccessDecisionView>('/api/risorse/cad/accesso', { sessionRef: bobRef })
@@ -262,7 +262,7 @@ test('login monouso, 4 risposte simulate e ordine CAD di esempio 10 / 1 / 9 XRP'
   })
   assert.equal(aliceSuspended.data.code, 'ALICE_SUSPENDED')
   assert.equal(aliceSuspended.data.canAccess, false)
-  assert.match(aliceSuspended.data.headline, /Hai affittato la tua licenza a Bob fino al/)
+  assert.match(aliceSuspended.data.headline, /You have rented your license to Bob until/)
 
   await h.api('/api/simulazione/preset', { method: 'POST', body: { preset: 'expired_rental' } })
   const bobExpired = await h.api<AccessDecisionView>('/api/risorse/cad/accesso', { sessionRef: bobRef })
@@ -288,7 +288,7 @@ test('login monouso, 4 risposte simulate e ordine CAD di esempio 10 / 1 / 9 XRP'
   )
 })
 
-test('Prova 1 · Veto dell’ente, rifiuto motivato e nuova revisione con nuovo consenso di Bob', async (t) => {
+test('Test 1 · Authority veto, reasoned rejection, and new revision with fresh Bob consent', async (t) => {
   const h = await createTestHarness(t)
   const aliceRef = await h.loginRole('alice')
   const bobRef = await h.loginRole('bob')
@@ -306,11 +306,11 @@ test('Prova 1 · Veto dell’ente, rifiuto motivato e nuova revisione con nuovo 
   })
   assert.equal(ord1.status, 'awaiting_authority')
 
-  // Finché l'ente non approva, Bob resta escluso anche chiamando direttamente /api/cad/cad/progetto.
+  // Until the authority approves, Bob stays blocked even when calling /api/cad/cad/progetto directly.
   const deniedProj = await h.api('/api/cad/cad/progetto', { sessionRef: bobRef })
   assert.equal(deniedProj.status, 403)
 
-  // L'ente dell'altra demo (Comune) non può decidere su CAD.
+  // The authority for the other demo (Municipality) cannot decide on CAD.
   const wrongAuth = await h.api(`/api/ordini/${ord1.orderId}/decisione`, {
     method: 'POST',
     sessionRef: comuneRef,
@@ -318,19 +318,19 @@ test('Prova 1 · Veto dell’ente, rifiuto motivato e nuova revisione con nuovo 
   })
   assert.equal(wrongAuth.status, 403)
 
-  // L'ente CAD rifiuta con motivazione.
+  // The CAD authority rejects with a reason.
   const rej = await h.api<OrderView>(`/api/ordini/${ord1.orderId}/decisione`, {
     method: 'POST',
     sessionRef: cadRef,
-    body: { decision: 'reject', reason: 'Prezzo eccessivo per la finestra scelta' },
+    body: { decision: 'reject', reason: 'Excessive price for the selected window' },
   })
   assert.equal(rej.status, 200)
   assert.equal(rej.data.status, 'rejected')
-  assert.equal(rej.data.rejectionReason, 'Prezzo eccessivo per la finestra scelta')
+  assert.equal(rej.data.rejectionReason, 'Excessive price for the selected window')
   assert.equal(rej.data.calendarHeld, false)
   assert.equal(rej.data.vaultHeld, false)
 
-  // La vecchia accettazione non autorizza una nuova revisione di Alice.
+  // The old acceptance does not authorize Alice’s new revision.
   const nowSec = Math.floor(h.node.nowMillis() / 1000)
   const propRev2 = await h.api<{ proposal: unknown; proof: unknown }>('/api/local-signer/proposal', {
     method: 'POST',
@@ -370,7 +370,7 @@ test('Prova 1 · Veto dell’ente, rifiuto motivato e nuova revisione con nuovo 
   })
   assert.equal(staleRes.status, 409)
 
-  // Nuova accettazione di Bob su revisione 2 riesce.
+  // Fresh acceptance from Bob on revision 2 succeeds.
   const freshAccept = await h.api('/api/local-signer/order', {
     method: 'POST',
     body: {
@@ -390,7 +390,7 @@ test('Prova 1 · Veto dell’ente, rifiuto motivato e nuova revisione con nuovo 
   assert.equal(freshRes.data.priceDrops, '10000000')
 })
 
-test('Concorrenza su calendario e vincolo univoco SQLite sul vault, parallelo sul secondo vault e riuso', async (t) => {
+test('Calendar concurrency and SQLite unique constraint on vault, parallel second vault, and reuse', async (t) => {
   const h = await createTestHarness(t)
   const aliceRef = await h.loginRole('alice')
   const bobRef = await h.loginRole('bob')
@@ -407,7 +407,7 @@ test('Concorrenza su calendario e vincolo univoco SQLite sul vault, parallelo su
     fundOffsetSec: 30,
   })
 
-  // Un secondo ordine sullo stesso periodo riceve 409.
+  // A second order on the same period receives 409.
   const nowSec = Math.floor(h.node.nowMillis() / 1000)
   const overlapProp = await h.api<{ proposal: unknown; proof: unknown }>('/api/local-signer/proposal', {
     method: 'POST',
@@ -433,7 +433,7 @@ test('Concorrenza su calendario e vincolo univoco SQLite sul vault, parallelo su
   assert.equal(overlapRes.status, 409)
   assert.equal(overlapRes.data.code, 'PERIOD_ALREADY_RESERVED')
 
-  // Un ordine per periodo contiguo [t+120, t+180) mentre ord1 è aperto sullo stesso vault riceve 409 VAULT_BUSY.
+  // An order for an adjacent period [t+120, t+180) while ord1 is open on the same vault receives 409 VAULT_BUSY.
   const adjProp = await h.api<{ proposal: unknown; proof: unknown }>('/api/local-signer/proposal', {
     method: 'POST',
     body: {
@@ -458,7 +458,7 @@ test('Concorrenza su calendario e vincolo univoco SQLite sul vault, parallelo su
   assert.equal(adjBusy.status, 409)
   assert.equal(adjBusy.data.code, 'VAULT_BUSY')
 
-  // Il secondo scenario (cartellone torino-01) può procedere in parallelo sul suo vault.
+  // The second scenario (billboard torino-01) can proceed in parallel on its own vault.
   const bbOrd = await h.publishAndAcceptOrder({
     aliceRef,
     bobRef,
@@ -471,7 +471,7 @@ test('Concorrenza su calendario e vincolo univoco SQLite sul vault, parallelo su
   })
   assert.equal(bbOrd.scenario, 'billboard')
 
-  // Completa e chiudi ord1 su CAD, poi verifica che il periodo contiguo sul medesimo vault riesca.
+  // Complete and close ord1 on CAD, then verify the adjacent period on the same vault succeeds.
   await h.api(`/api/ordini/${ord1.orderId}/decisione`, {
     method: 'POST',
     sessionRef: cadRef,
@@ -487,8 +487,8 @@ test('Concorrenza su calendario e vincolo univoco SQLite sul vault, parallelo su
     body: { action: 'settle', mode: 'ordinary' },
   })
 
-  // Ora il vault CAD è libero e [t+120, t+180) non si sovrappone con ord1 (che era [t+60, t+120)).
-  // Con orologio attuale a now+130s, creiamo un nuovo ordine contiguo/futuro [t+180, t+240).
+  // Now the CAD vault is free and [t+120, t+180) does not overlap with ord1 (which was [t+60, t+120)).
+  // With current clock at now+130s, create a new future order [t+180, t+240).
   const nowSec2 = Math.floor(h.node.nowMillis() / 1000)
   const reuseOrd = await h.publishAndAcceptOrder({
     aliceRef,
@@ -505,7 +505,7 @@ test('Concorrenza su calendario e vincolo univoco SQLite sul vault, parallelo su
 })
 
 for (const combinedMintOffer of [false, true]) {
-  test(`Prova 2 · Affitto CAD completo 10/1/9 XRP, manomissione SQLite e liquidazione 2-su-3 (mintOffer=${combinedMintOffer})`, async (t) => {
+  test(`Test 2 · Full CAD rental 10/1/9 XRP, SQLite tampering, and 2-of-3 settlement (mintOffer=${combinedMintOffer})`, async (t) => {
     const h = await createTestHarness(t, { combinedMintOffer })
     const aliceRef = await h.loginRole('alice')
     const bobRef = await h.loginRole('bob')
@@ -528,7 +528,7 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(initialFunds.accounts.bob?.balanceDrops, h.node.getBalanceDrops(bobAddr).toString())
     assert.equal(initialFunds.escrow.lockedDrops, '0')
 
-    // Prima dell'affitto: Alice apre il progetto, Bob è escluso.
+    // Before the rental: Alice opens the project, Bob is excluded.
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: aliceRef })).status, 200)
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: bobRef })).status, 403)
 
@@ -570,13 +570,13 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(afterFee.accounts.bob?.balanceDrops, h.node.getBalanceDrops(bobAddr).toString())
     assert.equal(afterFee.escrow.lockedDrops, '0')
 
-    // Manomissione diretta su SQLite senza deposito escrow sul ledger non abilita Bob.
+    // Direct SQLite tampering without an on-ledger escrow deposit does not grant Bob access.
     h.service.store.db
       .prepare("UPDATE orders SET status = 'confirmed', createHash = ? WHERE orderId = ?")
       .run('9'.repeat(64), order.orderId)
     h.node.advanceSeconds(70)
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: bobRef })).status, 403)
-    // Ripristina stato coerente e riporta orologio prima della scadenza per completare il deposito vero.
+    // Restore consistent state and rewind clock before deadline to perform the real deposit.
     h.service.store.db
       .prepare("UPDATE orders SET status = 'pass_delivered_unfunded', createHash = NULL WHERE orderId = ?")
       .run(order.orderId)
@@ -597,13 +597,13 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(afterDeposit.accounts.bob?.balanceDrops, h.node.getBalanceDrops(bobAddr).toString())
     assert.ok(BigInt(afterDeposit.accounts.bob!.spendableDrops) < BigInt(afterDeposit.accounts.bob!.balanceDrops))
 
-    // Prima dell'inizio: Alice accede ancora, Bob riceve 409 CONFIRMED_BEFORE_START.
+    // Before start: Alice still has access, Bob gets 409 CONFIRMED_BEFORE_START.
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: aliceRef })).status, 200)
     const beforeStart = await h.api<{ code: string }>('/api/cad/cad/progetto', { sessionRef: bobRef })
     assert.equal(beforeStart.status, 409)
     assert.equal(beforeStart.data.code, 'CONFIRMED_BEFORE_START')
 
-    // All'inizio del periodo: Bob apre il progetto, Alice è sospesa, sblocco anticipato respinto.
+    // At period start: Bob opens the project, Alice is suspended, early release is rejected.
     h.node.advanceSeconds(70)
     const bobOpen = await h.api<{ project: { projectId: string } }>('/api/cad/cad/progetto', {
       sessionRef: bobRef,
@@ -616,9 +616,9 @@ for (const combinedMintOffer of [false, true]) {
     })
     assert.equal(aliceBlocked.status, 403)
     assert.equal(aliceBlocked.data.code, 'ALICE_SUSPENDED')
-    assert.match(aliceBlocked.data.message, /sospese/)
+    assert.match(aliceBlocked.data.message, /suspended/)
 
-    // Un pass CAD non autorizza mai il cartellone torino-01.
+    // A CAD pass never authorizes the torino-01 billboard.
     assert.equal(
       (
         await h.api('/api/cartelloni/torino-01/immagine', {
@@ -631,14 +631,14 @@ for (const combinedMintOffer of [false, true]) {
       403,
     )
 
-    // Sblocco anticipato prima della scadenza rifiutato.
+    // Early release before expiration is rejected.
     assert.equal(
       (await h.api(`/api/ordini/${order.orderId}/sblocco`, { method: 'POST', sessionRef: aliceRef }))
         .status,
       409,
     )
 
-    // Alla scadenza: Bob perde accesso subito (anche prima delle firme), Alice recupera.
+    // Upon expiration: Bob immediately loses access (even before signatures), Alice regains it.
     h.node.advanceSeconds(120)
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: bobRef })).status, 403)
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: aliceRef })).status, 200)
@@ -654,7 +654,7 @@ for (const combinedMintOffer of [false, true]) {
     assert.deepEqual(afterRelease.escrow, { state: 'credited_to_vault', lockedDrops: '0', creditedDrops: '9000000' })
     assert.equal(BigInt(afterRelease.accounts.vault!.balanceDrops) - BigInt(afterDeposit.accounts.vault!.balanceDrops), 9_000_000n)
 
-    // Alice e il fornitore CAD liquidano tutti i 9 XRP con due firme.
+    // Alice and the CAD provider settle all 9 XRP with two signatures.
     const prep = await h.api<{ order: OrderView; progress: { phase: string } }>(
       `/api/ordini/${order.orderId}/liquidazione`,
       { method: 'POST', sessionRef: aliceRef, body: { action: 'prepare', mode: 'ordinary' } },
@@ -691,7 +691,7 @@ for (const combinedMintOffer of [false, true]) {
     assert.deepEqual(afterPayout.payout, { beneficiary: 'alice', deliveredDrops: '9000000' })
     assert.equal(BigInt(afterPayout.accounts.alice!.balanceDrops) - BigInt(afterRelease.accounts.alice!.balanceDrops), 9_000_000n)
 
-    // Test arbitrato a favore di Bob su un secondo ordine: Ente + Bob firmano e 9 XRP tornano a Bob.
+    // Test arbitration in Bob’s favor on a second order: Authority + Bob sign and 9 XRP return to Bob.
     const bobBalBeforeArb = h.node.getBalanceDrops(bobAddr)
     const arbOrder = await h.publishAndAcceptOrder({
       aliceRef,
@@ -724,19 +724,19 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(arbSettle.status, 200)
     assert.equal(arbSettle.data.order.status, 'settled')
     assert.equal(arbSettle.data.order.receipts.payoutBeneficiary, bobAddr)
-    // Bob ha speso 10 XRP (1 XRP fee + 9 XRP escrow) + piccole tx fee e ha recuperato 9 XRP.
+    // Bob spent 10 XRP (1 XRP fee + 9 XRP escrow) + small tx fees and recovered 9 XRP.
     assert.ok(bobBalBeforeArb - h.node.getBalanceDrops(bobAddr) < 1_001_000n)
   })
 }
 
-test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offline, recupero interrotto e riavvio', async (t) => {
+test('Test 3 · Billboard torino-01 (blank -> PNG/JPEG -> blank), 503 offline, interrupted recovery and restart', async (t) => {
   const h = await createTestHarness(t)
   const aliceRef = await h.loginRole('alice')
   const bobRef = await h.loginRole('bob')
   const comuneRef = await h.loginRole('comune')
   const bobAddr = h.runtime.setup.participants.bob
 
-  // 1. Player iniziale bianco senza pulsanti né login.
+  // 1. Initial blank player with no buttons or login.
   const screenHtml = await h.api<string>('/schermo/torino-01')
   assert.equal(screenHtml.status, 200)
   assert.match(screenHtml.data, /#ffffff/)
@@ -747,7 +747,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   assert.equal(curInit.data.active, false)
   assert.equal(curInit.data.imageUrl, null)
 
-  // 2. Affitto sul secondo vault (torino-01).
+  // 2. Rental on the second vault (torino-01).
   const bbOrder = await h.publishAndAcceptOrder({
     aliceRef,
     bobRef,
@@ -766,14 +766,14 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   await h.api(`/api/ordini/${bbOrder.orderId}/pass/accetta`, { method: 'POST', sessionRef: bobRef })
   await h.api(`/api/ordini/${bbOrder.orderId}/deposito`, { method: 'POST', sessionRef: bobRef })
 
-  // Entra nella finestra attiva: ancora bianco finché Bob non pubblica.
+  // Enter the active window: still blank until Bob publishes.
   h.node.advanceSeconds(70)
   assert.equal(
     (await h.api<{ active: boolean }>('/api/cartelloni/torino-01/corrente')).data.active,
     false,
   )
 
-  // Rifiuta file non decodificabili e tentativi di utenti non autorizzati.
+  // Reject undecodable files and unauthorized user attempts.
   const badUpload = await h.api('/api/cartelloni/torino-01/immagine', {
     method: 'POST',
     sessionRef: bobRef,
@@ -802,7 +802,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   const imgFetch = await h.api(curActive.data.imageUrl)
   assert.equal(imgFetch.status, 200)
 
-  // Tentativo respinto di Alice lascia attiva l'immagine legittima di Bob.
+  // Rejected attempt by Alice leaves Bob’s legitimate image active.
   const aliceUpload = await h.api('/api/cartelloni/torino-01/immagine', {
     method: 'POST',
     sessionRef: aliceRef,
@@ -816,7 +816,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
     160,
   )
 
-  // Test upload JPEG valido sempre durante la finestra attiva di Bob.
+  // Valid JPEG upload test still during Bob’s active window.
   const jpegUpload = await h.api('/api/cartelloni/torino-01/immagine', {
     method: 'POST',
     sessionRef: bobRef,
@@ -829,7 +829,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
     'image/jpeg',
   )
 
-  // Verifica 503 quando il ledger è indisponibile.
+  // Verify 503 when ledger is unavailable.
   h.node.setAvailable(false)
   const offlineAccess = await h.api<{ code: string }>('/api/risorse/cad/accesso', {
     sessionRef: aliceRef,
@@ -838,7 +838,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   assert.equal(offlineAccess.data.code, 'LEDGER_UNAVAILABLE')
   h.node.setAvailable(true)
 
-  // Alla scadenza il cartellone torna bianco anche prima della liquidazione.
+  // Upon expiration, the billboard turns blank even before settlement.
   h.node.advanceSeconds(120)
   const curAfterExpiry = await h.api<{ active: boolean; imageUrl: string | null }>(
     '/api/cartelloni/torino-01/corrente',
@@ -890,7 +890,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   assert.equal(settled.data.order.receipts.payoutDeliveredDrops, '9000000')
   assert.equal(h.node.getBalanceDrops(aliceAddr) - aliceBeforePayout, 9_000_000n)
 
-  // 3. Ordine con checkout interrotto dopo consegna del pass -> perdita risposta sul rimborso -> riavvio -> ripresa unica.
+  // 3. Order with checkout interrupted after pass delivery -> lost response on refund -> restart -> single recovery.
   const abortedOrder = await h.publishAndAcceptOrder({
     aliceRef,
     bobRef,
@@ -912,9 +912,9 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   })
 
   const bobBalAfterFee = h.node.getBalanceDrops(bobAddr)
-  h.node.advanceSeconds(40) // oltre fundBy
+  h.node.advanceSeconds(40) // past fundBy
 
-  // Simula perdita di risposta / transazione in attesa su NFTokenBurn, poi riavvio tra burn e rimborso fee!
+  // Simulate lost response / pending transaction on NFTokenBurn, then restart between burn and fee refund!
   h.node.setAutoValidateSubmits(false)
   h.node.loseNextSubmit()
   const rec1 = await h.api<OrderView>(`/api/ordini/${abortedOrder.orderId}/recupero`, {
@@ -926,7 +926,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   assert.equal(rec1.data.pendingStep, 'revoke_pass')
   assert.equal(rec1.data.vaultHeld, true)
 
-  // Il ledger valida il burn pendente mentre il server è stato riavviato: al riavvio riconcilia burn ed esegue solo il rimborso mancante!
+  // The ledger validates the pending burn while the server restarts: after restart it reconciles the burn and runs only the missing refund!
   await h.restartBackend()
   h.node.setAutoValidateSubmits(true)
   h.node.flushPendingSubmits()
@@ -947,7 +947,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   assert.notEqual(rec2.data.receipts.burnTxHash, rec2.data.receipts.refundTxHash)
   assert.equal(h.node.getBalanceDrops(bobAddr) - bobBalAfterFee, 1_000_000n)
 
-  // Chiamare nuovamente /recupero è idempotente e non effettua un secondo rimborso.
+  // Calling /recupero again is idempotent and does not issue a second refund.
   const recRepeat = await h.api<OrderView>(`/api/ordini/${abortedOrder.orderId}/recupero`, {
     method: 'POST',
     sessionRef: comuneRefAfterRestart,
@@ -955,7 +955,7 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   assert.equal(recRepeat.status, 200)
   assert.equal(h.node.getBalanceDrops(bobAddr) - bobBalAfterFee, 1_000_000n)
 
-  // 4. Offerta scaduta senza accettazione di Bob -> burn senza Owner, nessun addebito né rimborso.
+  // 4. Offer expired without Bob accepting -> burn without Owner, no charge or refund.
   const aliceRefAfterRestart = await h.loginRole('alice')
   const unacceptedOrder = await h.publishAndAcceptOrder({
     aliceRef: aliceRefAfterRestart,

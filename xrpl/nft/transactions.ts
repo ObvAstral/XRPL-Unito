@@ -74,7 +74,7 @@ export class AttemptJournal {
        ON CONFLICT DO NOTHING`,
     ).run(id, account, fingerprint, JSON.stringify(attempt))
     if (existing.changes === 0) {
-      throw new Error('Esiste già un tentativo in corso per questo wallet o comando. Riconcilialo prima di riprovare.')
+      throw new Error('An in-flight attempt already exists for this wallet or command. Reconcile it before retrying.')
     }
   }
 
@@ -117,7 +117,7 @@ async function finalize(rpc: LedgerRequest, attempt: SignedAttempt): Promise<Out
 
   const index = readUint32(data.ledger_index)
   if (index < attempt.firstLedger || index > attempt.lastLedger) {
-    throw new Error('Indice di validazione fuori dall’intervallo del tentativo.')
+    throw new Error('Validation ledger index outside attempt range.')
   }
   const meta = record(data.meta)
   const code = meta.TransactionResult
@@ -133,10 +133,10 @@ async function finalize(rpc: LedgerRequest, attempt: SignedAttempt): Promise<Out
 async function prepare<T extends Transaction>(rpc: LedgerRequest, tx: T, snapshot: Snapshot, fee: string) {
   const account = await rpc('account_info', { account: tx.Account, ledger_hash: snapshot.hash })
   if (account.validated === false || readHash(account.ledger_hash) !== snapshot.hash) {
-    throw new Error('Sequence non disponibile sullo snapshot selezionato.')
+    throw new Error('Sequence unavailable on the selected snapshot.')
   }
   const details = record(account.account_data)
-  if (details.Account !== tx.Account) throw new Error('L’account del wallet non corrisponde.')
+  if (details.Account !== tx.Account) throw new Error('Wallet account mismatch.')
   return {
     ...tx,
     Fee: fee,
@@ -148,7 +148,7 @@ async function prepare<T extends Transaction>(rpc: LedgerRequest, tx: T, snapsho
 async function readFee(rpc: LedgerRequest): Promise<string> {
   const { open_ledger_fee } = record((await rpc('fee')).drops)
   if (typeof open_ledger_fee !== 'string' || !/^[1-9]\d{0,3}$/.test(open_ledger_fee) || Number(open_ledger_fee) > 1000) {
-    throw new Error('Fee Testnet non valida o superiore al limite di 1000 drops.')
+    throw new Error('Invalid Testnet fee or exceeds 1000 drops limit.')
   }
   return open_ledger_fee
 }
@@ -168,13 +168,13 @@ interface RunOptions<T extends Transaction> {
 
 export async function runTransaction<T extends Transaction>(options: RunOptions<T>): Promise<Outcome> {
   const { rpc, journal, signer, orderId, tx, preflight, confirm, pause = () => sleep(1800) } = options
-  if (signer.classicAddress !== tx.Account) throw new Error('Il wallet non può firmare per questo ruolo.')
+  if (signer.classicAddress !== tx.Account) throw new Error('Wallet cannot sign for this role.')
 
   const id = JSON.stringify([signer.classicAddress, orderId, tx.TransactionType])
   const fingerprint = createHash('sha256').update(JSON.stringify([tx, options.context ?? null])).digest('hex')
   const saved = journal.read(id)
   if (saved && saved.fingerprint !== fingerprint && saved.outcome?.status !== 'rejected') {
-    throw new Error('I termini sono cambiati rispetto al tentativo registrato per questo comando.')
+    throw new Error('Terms changed relative to the attempt recorded for this command.')
   }
   if (saved?.outcome?.status === 'validated') return saved.outcome
 
@@ -183,11 +183,11 @@ export async function runTransaction<T extends Transaction>(options: RunOptions<
     attempt = saved.attempt
   } else {
     if (journal.hasPending(signer.classicAddress)) {
-      throw new Error('Il wallet ha un tentativo in sospeso. Ripeti il relativo comando per riconciliarlo.')
+      throw new Error('Wallet has a pending attempt. Repeat that command to reconcile it.')
     }
     const fee = await readFee(rpc)
     if (preflight) await preflight(await recentSnapshot(rpc))
-    if (!(await confirm(fee))) throw new Error('Firma annullata.')
+    if (!(await confirm(fee))) throw new Error('Signature canceled.')
     const snapshot = await recentSnapshot(rpc)
     const prepared = await prepare(rpc, tx, snapshot, fee)
     if (preflight) await preflight(snapshot)

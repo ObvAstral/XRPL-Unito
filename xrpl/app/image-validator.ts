@@ -69,11 +69,11 @@ function channelsForPngColorType(colorType: number): number | null {
 
 function decodePng(bytes: Uint8Array): DecodedImageInfo {
   if (bytes.length < 33) {
-    throw new Error('File PNG troppo corto o incompleto.')
+    throw new Error('PNG file too short or incomplete.')
   }
   for (let i = 0; i < PNG_SIGNATURE.length; i++) {
     if (bytes[i] !== PNG_SIGNATURE[i]) {
-      throw new Error('Firma PNG non valida.')
+      throw new Error('Invalid PNG signature.')
     }
   }
 
@@ -89,7 +89,7 @@ function decodePng(bytes: Uint8Array): DecodedImageInfo {
 
   while (offset < bytes.length) {
     if (offset + 12 > bytes.length) {
-      throw new Error('Chunk PNG troncato.')
+      throw new Error('Truncated PNG chunk.')
     }
     const length = readUint32BE(bytes, offset)
     const type = String.fromCharCode(
@@ -101,18 +101,18 @@ function decodePng(bytes: Uint8Array): DecodedImageInfo {
     const dataStart = offset + 8
     const dataEnd = dataStart + length
     if (dataEnd + 4 > bytes.length) {
-      throw new Error(`Chunk PNG ${type} oltre la fine del file.`)
+      throw new Error(`PNG chunk ${type} extends beyond end of file.`)
     }
     const expectedCrc = readUint32BE(bytes, dataEnd)
     const actualCrc = crc32(bytes.subarray(offset + 4, dataEnd))
     if (expectedCrc !== actualCrc) {
-      throw new Error(`Checksum CRC32 non valido nel chunk PNG ${type}.`)
+      throw new Error(`Invalid CRC32 checksum in PNG chunk ${type}.`)
     }
 
     const data = bytes.subarray(dataStart, dataEnd)
     if (!sawIhdr) {
       if (type !== 'IHDR' || length !== 13) {
-        throw new Error('Intestazione IHDR PNG mancante o non valida.')
+        throw new Error('Missing or invalid PNG IHDR header.')
       }
       width = readUint32BE(data, 0)
       height = readUint32BE(data, 4)
@@ -132,14 +132,14 @@ function decodePng(bytes: Uint8Array): DecodedImageInfo {
         filter !== 0 ||
         (interlace !== 0 && interlace !== 1)
       ) {
-        throw new Error('Parametri IHDR PNG non validi.')
+        throw new Error('Invalid PNG IHDR parameters.')
       }
       sawIhdr = true
     } else if (type === 'IDAT') {
       idatChunks.push(data)
     } else if (type === 'IEND') {
       if (length !== 0) {
-        throw new Error('Chunk IEND PNG non valido.')
+        throw new Error('Invalid PNG IEND chunk.')
       }
       sawIend = true
       offset = dataEnd + 4
@@ -150,7 +150,7 @@ function decodePng(bytes: Uint8Array): DecodedImageInfo {
   }
 
   if (!sawIhdr || !sawIend || idatChunks.length === 0) {
-    throw new Error('Struttura PNG incompleta (IHDR, IDAT o IEND mancanti).')
+    throw new Error('Incomplete PNG structure (missing IHDR, IDAT, or IEND).')
   }
 
   const totalIdatLength = idatChunks.reduce((acc, c) => acc + c.length, 0)
@@ -165,7 +165,7 @@ function decodePng(bytes: Uint8Array): DecodedImageInfo {
   try {
     inflated = inflateSync(compressed)
   } catch {
-    throw new Error('Dati immagine PNG non decodificabili (stream zlib corrotto).')
+    throw new Error('Undecodable PNG image data (corrupt zlib stream).')
   }
 
   const channels = channelsForPngColorType(colorType)!
@@ -174,10 +174,10 @@ function decodePng(bytes: Uint8Array): DecodedImageInfo {
     const rowBytes = Math.ceil((width * bitsPerPixel) / 8)
     const expectedLength = height * (1 + rowBytes)
     if (inflated.length !== expectedLength) {
-      throw new Error('Dati pixel PNG non coerenti con le dimensioni dichiarate.')
+      throw new Error('PNG pixel data does not match declared dimensions.')
     }
   } else if (inflated.length < height) {
-    throw new Error('Dati pixel PNG interlacciati incompleti.')
+    throw new Error('Incomplete interlaced PNG pixel data.')
   }
 
   return {
@@ -190,7 +190,7 @@ function decodePng(bytes: Uint8Array): DecodedImageInfo {
 
 function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
   if (bytes.length < 16 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) {
-    throw new Error('Firma JPEG non valida.')
+    throw new Error('Invalid JPEG signature.')
   }
 
   let offset = 2
@@ -202,7 +202,7 @@ function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
 
   while (offset < bytes.length) {
     if (bytes[offset] !== 0xff) {
-      throw new Error('Segmento JPEG non allineato al marcatore.')
+      throw new Error('JPEG segment not aligned to marker.')
     }
     while (offset < bytes.length && bytes[offset] === 0xff) {
       offset += 1
@@ -220,16 +220,16 @@ function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
     }
 
     if (offset + 2 > bytes.length) {
-      throw new Error('Lunghezza segmento JPEG troncata.')
+      throw new Error('Truncated JPEG segment length.')
     }
     const segLen = readUint16BE(bytes, offset)
     if (segLen < 2 || offset + segLen > bytes.length) {
-      throw new Error('Lunghezza segmento JPEG non valida.')
+      throw new Error('Invalid JPEG segment length.')
     }
 
     if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2) {
       if (segLen < 8) {
-        throw new Error('Segmento SOF JPEG non valido.')
+        throw new Error('Invalid JPEG SOF segment.')
       }
       const precision = bytes[offset + 2]!
       height = readUint16BE(bytes, offset + 3)
@@ -243,7 +243,7 @@ function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
         height > 16_384 ||
         ![1, 3, 4].includes(components)
       ) {
-        throw new Error('Dimensioni o componenti SOF JPEG non validi.')
+        throw new Error('Invalid JPEG SOF dimensions or components.')
       }
       sawSof = true
     }
@@ -252,7 +252,7 @@ function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
 
     if (marker === 0xda) {
       sawSos = true
-      // Dopo SOS segue il flusso entropico fino al marcatore EOI (FF D9), saltando byte stuffing FF 00 e RSTn.
+      // Scan entropy-coded stream after SOS until EOI (FF D9), skipping stuffed FF 00 and RSTn markers.
       let foundEoi = false
       while (offset < bytes.length - 1) {
         if (bytes[offset] === 0xff) {
@@ -266,7 +266,7 @@ function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
             foundEoi = true
             break
           }
-          // Altri marcatori possibili nel flusso progressivo (es. DHT/SOS successivi).
+          // Other possible markers in progressive streams (e.g. subsequent DHT/SOS).
           break
         }
         offset += 1
@@ -276,7 +276,7 @@ function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
   }
 
   if (!sawSof || !sawSos || !sawEoi || width < 1 || height < 1) {
-    throw new Error('File JPEG incompleto o non decodificabile.')
+    throw new Error('Incomplete or undecodable JPEG file.')
   }
 
   return {
@@ -289,10 +289,10 @@ function decodeJpeg(bytes: Uint8Array): DecodedImageInfo {
 
 export function validateAndDecodeImage(bytes: Uint8Array): DecodedImageInfo {
   if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
-    throw new Error('File immagine vuoto o assente.')
+    throw new Error('Empty or missing image file.')
   }
   if (bytes.length > 10 * 1024 * 1024) {
-    throw new Error('Immagine troppo grande (limite 10 MB).')
+    throw new Error('Image too large (10 MB limit).')
   }
   if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
     return decodePng(bytes)
@@ -300,7 +300,7 @@ export function validateAndDecodeImage(bytes: Uint8Array): DecodedImageInfo {
   if (bytes[0] === 0xff && bytes[1] === 0xd8) {
     return decodeJpeg(bytes)
   }
-  throw new Error('Formato immagine non consentito: è richiesto un file PNG o JPEG valido.')
+  throw new Error('Unsupported image format: a valid PNG or JPEG file is required.')
 }
 
 function pngChunk(type: string, data: Uint8Array): Uint8Array {

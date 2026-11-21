@@ -25,7 +25,7 @@ function simulation(combined: boolean) {
   const submitted: Fields[] = []
   const acted: { enabled: boolean; lostReply: boolean } = { enabled: true, lostReply: false }
   const rpc: LedgerRequest = async (command, params = {}) => {
-    if (!acted.enabled) throw new Error('Rete indisponibile')
+    if (!acted.enabled) throw new Error('Network unavailable')
     const snapshot = { ledger_hash: ledgerHash, ledger_index: index, validated: true }
     if (command === 'ledger') return { ...snapshot, ledger: { close_time: closeTime } }
     if (command === 'account_info') return { ...snapshot, account_data: { Account: params.account, Sequence: index } }
@@ -45,7 +45,7 @@ function simulation(combined: boolean) {
       if (!result) throw new RpcError('txnNotFound', true)
       return result
     }
-    if (command !== 'submit') throw new Error('RPC inatteso ' + command)
+    if (command !== 'submit') throw new Error('Unexpected RPC ' + command)
 
     const blob = String(params.tx_blob)
     const tx = decode(blob)
@@ -87,14 +87,14 @@ function simulation(combined: boolean) {
     history.set(txHash, { hash: txHash, validated: true, ledger_hash: ledgerHash, ledger_index: index, meta })
     if (acted.lostReply) {
       acted.enabled = false
-      throw new Error('Risposta submit persa')
+      throw new Error('Lost submit response')
     }
     return {}
   }
   return { rpc, submitted, acted, advance: (utc: string) => { closeTime = rippleTime(utc) + 1 } }
 }
 
-test('login vincolato al dominio, alla sessione e al consumo monouso', () => {
+test('login bound to domain, session, and single-use consumption', () => {
   const signer = account()
   let now = Date.now()
   const login = new WalletLogin(':memory:', 'localhost:3000', () => now)
@@ -115,7 +115,7 @@ test('login vincolato al dominio, alla sessione e al consumo monouso', () => {
   }
 })
 
-test('Alice e Bob firmano lo stesso pagamento del vault senza inviarlo', () => {
+test('Alice and Bob sign the same vault payment without submitting', () => {
   const alice = account()
   const bob = account()
   const payment: Payment = {
@@ -133,7 +133,7 @@ test('Alice e Bob firmano lo stesso pagamento del vault senza inviarlo', () => {
 })
 
 for (const combined of [false, true]) {
-  test('titolo, accordo, fee, possesso e revoca con mint-offer ' + combined, async () => {
+  test('title, agreement, fee, ownership, and revocation with mint-offer ' + combined, async () => {
     const alice = account()
     const bob = account()
     const issuer = account()
@@ -196,7 +196,7 @@ for (const combined of [false, true]) {
 
       const abandoned = { ...proposal, acceptance: signOrder(proposal, { ...order, orderId: 'abandoned' }, bob) }
       const unaccepted = await nft.issuePass(abandoned, resource, signing(issuer))
-      if (unaccepted.status !== 'validated') assert.fail('Attesa offerta validata')
+      if (unaccepted.status !== 'validated') assert.fail('Expected validated offer')
       const missing = async () => 'missing' as const
       await assert.rejects(nft.revokePass(bundle, resource, pass.nftId, signing(issuer), missing))
       advance(fundBy)

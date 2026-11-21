@@ -34,46 +34,46 @@ export function isHash(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value)
 }
 
-export function normalizeHash(value: string, label = 'Hash XRPL'): string {
-  if (!isHash(value)) throw new Error(`${label} non valido`)
+export function normalizeHash(value: string, label = 'XRPL hash'): string {
+  if (!isHash(value)) throw new Error(`Invalid ${label}`)
   return value.toUpperCase()
 }
 
-export function parsePositiveDrops(value: string | bigint, label = 'Importo in drops'): bigint {
+export function parsePositiveDrops(value: string | bigint, label = 'Amount in drops'): bigint {
   if (typeof value === 'bigint') {
     if (value < 1n || value > MAX_XRPL_DROPS) {
-      throw new Error(`${label} fuori intervallo XRPL`)
+      throw new Error(`${label} out of XRPL range`)
     }
     return value
   }
   if (typeof value !== 'string' || !/^[1-9][0-9]{0,17}$/.test(value)) {
-    throw new Error(`${label} deve essere un intero positivo in drops`)
+    throw new Error(`${label} must be a positive integer in drops`)
   }
   const parsed = BigInt(value)
   if (parsed < 1n || parsed > MAX_XRPL_DROPS) {
-    throw new Error(`${label} fuori intervallo XRPL`)
+    throw new Error(`${label} out of XRPL range`)
   }
   return parsed
 }
 
 /**
- * Calcola il riparto commerciale v2 con aritmetica intera:
+ * Computes the v2 commercial split using integer arithmetic:
  * feeDrops = floor(grossDrops * feeBps / 10000)
  * netDrops = grossDrops - feeDrops
- * Richiede almeno 1 drop sia per la fee sia per il netto.
+ * Requires at least 1 drop for both fee and net.
  */
 export function splitRentalAmount(
   grossDrops: string | bigint,
   feeBps: number,
 ): RentalAmountSplit {
-  const gross = parsePositiveDrops(grossDrops, 'Prezzo lordo')
+  const gross = parsePositiveDrops(grossDrops, 'Gross price')
   if (!Number.isInteger(feeBps) || feeBps < 1 || feeBps >= 10_000) {
-    throw new Error('Percentuale feeBps attesa come intero compreso tra 1 e 9999')
+    throw new Error('feeBps must be an integer between 1 and 9999')
   }
   const fee = (gross * BigInt(feeBps)) / 10_000n
   const net = gross - fee
   if (fee < 1n || net < 1n) {
-    throw new Error('Fee e netto devono valere almeno 1 drop ciascuno')
+    throw new Error('Fee and net must each be at least 1 drop')
   }
   return {
     grossDrops: gross.toString(),
@@ -87,21 +87,21 @@ export function isRippleTime(value: number): boolean {
   return Number.isInteger(value) && value > 0 && value <= 0xffff_ffff
 }
 
-export function toRippleTime(value: string, label = 'Data UTC'): number {
+export function toRippleTime(value: string, label = 'UTC timestamp'): number {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.000)?Z$/.test(value)) {
-    throw new Error(`${label} attesa in UTC ISO 8601 al secondo`)
+    throw new Error(`${label} must be UTC ISO 8601 at second precision`)
   }
   const unixMillis = Date.parse(value)
   if (!Number.isFinite(unixMillis)) {
-    throw new Error(`${label} non valida`)
+    throw new Error(`Invalid ${label}`)
   }
   const canonical = new Date(unixMillis).toISOString()
   if (value !== canonical && value !== canonical.replace('.000Z', 'Z')) {
-    throw new Error(`${label} calendario UTC non valido`)
+    throw new Error(`Invalid UTC calendar ${label}`)
   }
   const rippleSeconds = unixMillis / 1000 - RIPPLE_EPOCH_SECONDS
   if (!isRippleTime(rippleSeconds)) {
-    throw new Error(`${label} fuori intervallo temporale XRPL`)
+    throw new Error(`${label} out of XRPL time range`)
   }
   return rippleSeconds
 }
@@ -114,43 +114,43 @@ export interface ParsedOrderSchedule {
 
 export function validateRentalOrder(order: RentalPaymentOrder): ParsedOrderSchedule {
   if (order.network !== 'testnet') {
-    throw new Error('Rete ordine non supportata: richiesta testnet')
+    throw new Error('Unsupported order network: testnet required')
   }
   if (order.scenario !== 'cad' && order.scenario !== 'billboard') {
-    throw new Error('Scenario vault non valido: richiesto cad o billboard')
+    throw new Error('Invalid vault scenario: cad or billboard required')
   }
   if (typeof order.orderId !== 'string' || !order.orderId.trim() || order.orderId !== order.orderId.trim()) {
-    throw new Error('orderId non valido')
+    throw new Error('Invalid orderId')
   }
   if (!isHash(order.agreementHash)) {
-    throw new Error('agreementHash deve essere uno SHA-256 esadecimale a 64 caratteri')
+    throw new Error('agreementHash must be a 64-character hex SHA-256')
   }
   const addresses = [order.alice, order.bob, order.authority, order.vault]
   if (!addresses.every((addr) => typeof addr === 'string' && isValidClassicAddress(addr))) {
-    throw new Error('Indirizzi XRPL classici non validi nell’ordine')
+    throw new Error('Invalid classic XRPL addresses in order')
   }
   if (new Set(addresses).size !== 4) {
-    throw new Error('Alice, Bob, ente e vault devono avere quattro indirizzi distinti')
+    throw new Error('Alice, Bob, authority, and vault must have four distinct addresses')
   }
 
   const expectedSplit = splitRentalAmount(order.grossDrops, order.feeBps)
   if (order.feeDrops !== expectedSplit.feeDrops || order.netDrops !== expectedSplit.netDrops) {
-    throw new Error('Riparto feeDrops/netDrops incoerente con grossDrops e feeBps')
+    throw new Error('feeDrops/netDrops split does not match grossDrops and feeBps')
   }
 
   const checkoutBy = toRippleTime(order.checkoutDeadline, 'checkoutDeadline')
   const startAt = toRippleTime(order.startAt, 'startAt')
   const finishAfter = toRippleTime(order.endAt, 'endAt')
   if (checkoutBy > startAt || startAt >= finishAfter) {
-    throw new Error('Scadenze incoerenti: richiesto checkoutDeadline <= startAt < endAt')
+    throw new Error('Inconsistent deadlines: required checkoutDeadline <= startAt < endAt')
   }
 
   return { checkoutBy, startAt, finishAfter }
 }
 
 /**
- * Costruisce l'EscrowCreate temporale v2 per il netto:
- * destinazione vault dello scenario, FinishAfter = endAt, senza Condition e senza CancelAfter.
+ * Builds the v2 time-locked EscrowCreate for the net amount:
+ * destination is the scenario vault, FinishAfter = endAt, no Condition and no CancelAfter.
  */
 export function buildEscrowCreate(order: RentalPaymentOrder): EscrowCreate {
   const { finishAfter } = validateRentalOrder(order)
@@ -170,13 +170,13 @@ export function buildEscrowFinish(
 ): EscrowFinish {
   validateRentalOrder(order)
   if (deposit.owner !== order.bob) {
-    throw new Error('Owner del deposito diverso da Bob nell’ordine')
+    throw new Error('Deposit owner differs from Bob in order')
   }
   if (!Number.isInteger(deposit.sequence) || deposit.sequence < 1) {
-    throw new Error('OfferSequence dell’escrow non valida')
+    throw new Error('Invalid escrow OfferSequence')
   }
   if (!isValidClassicAddress(senderAddress)) {
-    throw new Error('Indirizzo account operativo per EscrowFinish non valido')
+    throw new Error('Invalid operator account address for EscrowFinish')
   }
   return {
     TransactionType: 'EscrowFinish',
@@ -281,10 +281,10 @@ export function canonicalSignerAddresses(
   signers: readonly [string, string, string],
 ): [string, string, string] {
   if (signers.length !== 3 || !signers.every((addr) => isValidClassicAddress(addr))) {
-    throw new Error('Richiesti esattamente 3 indirizzi classici validi per il vault')
+    throw new Error('Exactly 3 valid classic addresses required for the vault')
   }
   if (new Set(signers).size !== 3) {
-    throw new Error('I tre firmatari del vault devono avere indirizzi distinti')
+    throw new Error('The three vault signers must have distinct addresses')
   }
   const sorted = [...signers].sort()
   return [sorted[0]!, sorted[1]!, sorted[2]!]
@@ -295,11 +295,11 @@ export function buildVaultSignerListSet(
   signers: readonly [string, string, string],
 ): SignerListSet {
   if (!isValidClassicAddress(vaultAddress)) {
-    throw new Error('Indirizzo del vault non valido')
+    throw new Error('Invalid vault address')
   }
   const ordered = canonicalSignerAddresses(signers)
   if (ordered.includes(vaultAddress)) {
-    throw new Error('Il vault non puo’ essere firmatario di se stesso')
+    throw new Error('Vault cannot be a signer of itself')
   }
   const entries: SignerEntry[] = ordered.map((account) => ({
     SignerEntry: {
@@ -317,7 +317,7 @@ export function buildVaultSignerListSet(
 
 export function buildVaultDisableMaster(vaultAddress: string): AccountSet {
   if (!isValidClassicAddress(vaultAddress)) {
-    throw new Error('Indirizzo del vault non valido')
+    throw new Error('Invalid vault address')
   }
   return {
     TransactionType: 'AccountSet',

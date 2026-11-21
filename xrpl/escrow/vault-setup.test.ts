@@ -59,7 +59,7 @@ function createSetupHarness(t: TestContext, options?: { mintOfferEnabled?: boole
     const tx = decode(blob) as Record<string, unknown>
     const sender = String(tx.Account)
     const acct = accounts.get(sender)
-    if (!acct) throw new Error(`Account ${sender} inesistente nel simulatore`)
+    if (!acct) throw new Error(`Account ${sender} does not exist in simulator`)
 
     const fee = BigInt(String(tx.Fee ?? '12'))
     acct.balanceDrops -= fee
@@ -203,18 +203,18 @@ function createSetupHarness(t: TestContext, options?: { mintOfferEnabled?: boole
           if (dropNextDisableMasterSubmit && preview.TransactionType === 'AccountSet') {
             dropNextDisableMasterSubmit = false
             applyTransaction(req.tx_blob)
-            throw new Error('Timeout RPC simulato dopo ricezione del nodo')
+            throw new Error('Simulated RPC timeout after node receipt')
           }
           applyTransaction(req.tx_blob)
           return { result: { engine_result: 'tesSUCCESS' } } as never
         }
         default:
-          throw new Error(`Comando RPC inatteso: ${req.command}`)
+          throw new Error(`Unexpected RPC command: ${req.command}`)
       }
     },
     async autofill<T extends SubmittableTransaction>(tx: T): Promise<T> {
       const acct = accounts.get(tx.Account)
-      if (!acct) throw new Error(`Account ${tx.Account} non trovato in autofill`)
+      if (!acct) throw new Error(`Account ${tx.Account} not found in autofill`)
       return {
         ...tx,
         Sequence: acct.sequence,
@@ -266,7 +266,7 @@ function createSetupHarness(t: TestContext, options?: { mintOfferEnabled?: boole
   }
 }
 
-test('due esecuzioni di setup-wallets: configura 2 vault distinti 2-su-3 con master disabilitata e al secondo avvio non invia transazioni', async (t) => {
+test('two runs of setup-wallets: configures 2 distinct 2-of-3 vaults with master disabled and sends no transactions on second run', async (t) => {
   const h = createSetupHarness(t, { mintOfferEnabled: true })
 
   const first = await runSetupWallets({
@@ -295,14 +295,14 @@ test('due esecuzioni di setup-wallets: configura 2 vault distinti 2-su-3 con mas
 
   assert.equal(first.publicOutput.capabilities.nftokenMintOfferEnabled, true)
   assert.equal(h.faucetCalls.length, 7)
-  // 2 transazioni per vault: SignerListSet seguita da AccountSet(asfDisableMaster) = 4 totali.
+  // 2 transactions per vault: SignerListSet followed by AccountSet(asfDisableMaster) = 4 total.
   assert.equal(h.submittedBlobs.length, 4)
 
   const cadState = h.accounts.get(cad.address)!
   assert.ok((cadState.flags & LSF_DISABLE_MASTER) !== 0)
   assert.equal(cadState.regularKey, undefined)
 
-  // Seconda esecuzione dopo riapertura di AttemptStore: zero nuove transazioni e zero chiamate faucet.
+  // Second run after reopening AttemptStore: zero new transactions and zero faucet calls.
   const reopened = h.reopenAttempts()
   h.setMintOfferEnabled(false)
 
@@ -322,7 +322,7 @@ test('due esecuzioni di setup-wallets: configura 2 vault distinti 2-su-3 con mas
   assert.equal(h.submittedBlobs.length, 4)
 })
 
-test('riprende senza duplicare transazioni dopo perdita risposta su AccountSet asfDisableMaster e rileva discrepanze SignerList', async (t) => {
+test('resumes without duplicating transactions after lost reply on AccountSet asfDisableMaster and detects SignerList mismatch', async (t) => {
   const h = createSetupHarness(t)
   h.simulateDisableMasterTimeoutOnce()
 
@@ -338,7 +338,7 @@ test('riprende senza duplicare transazioni dopo perdita risposta su AccountSet a
   assert.equal(result.publicOutput.vaults.cad.masterDisabled, true)
   assert.equal(h.submittedBlobs.length, 4)
 
-  // Simula una discrepanza sul vault registrato (es. RegularKey malevola o firmatari errati).
+  // Simulate mismatch on the registered vault (e.g. rogue RegularKey or wrong signers).
   const secrets = loadOrInitSecrets(h.stateDir)
   const corrupted = h.accounts.get(secrets.vaultBootstrap.cad.address)!
   corrupted.signerList = {

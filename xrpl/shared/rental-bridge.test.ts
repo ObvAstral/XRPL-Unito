@@ -24,7 +24,7 @@ const ledgerHash = 'A'.repeat(64)
 const utc = (offsetSec: number) => new Date(Date.now() + offsetSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
 const hexId = (n: number) => n.toString(16).toUpperCase().padStart(64, '0')
 
-test('alias del nodo Testnet condiviso fra setup e CLI', () => {
+test('shared Testnet node aliases between wallet setup and CLI', () => {
   assert.equal(normalizeTestnetNode(undefined), 'ripple')
   assert.equal(normalizeTestnetNode('xrpl-labs'), 'xrplLabs')
   assert.equal(normalizeTestnetNode('xrplLabs'), 'xrplLabs')
@@ -33,7 +33,7 @@ test('alias del nodo Testnet condiviso fra setup e CLI', () => {
   assert.throws(() => normalizeTestnetNode('mainnet'), /xrpl-labs/)
 })
 
-test('riparto e scadenze dell’accordo coincidono con validateRentalOrder', () => {
+test('agreement split and deadlines match validateRentalOrder', () => {
   for (const [priceDrops, feeBps] of [
     ['10000000', 1000],
     ['10000001', 1000],
@@ -56,7 +56,7 @@ test('riparto e scadenze dell’accordo coincidono con validateRentalOrder', () 
   }
 })
 
-test('pass, deposito e multifirma usano lo stesso accordo', async () => {
+test('pass, deposit, and multisig share the same agreement', async () => {
   const alice = new LocalSigner(Wallet.generate())
   const bob = new LocalSigner(Wallet.generate())
   const issuer = new LocalSigner(Wallet.generate())
@@ -163,7 +163,7 @@ test('pass, deposito e multifirma usano lo stesso accordo', async () => {
     assert.equal(Array.isArray(Signers) && Signers.length, 2)
     await assert.rejects(
       adaptLocalSigner(alice, async () => false).signForMultisig(prepared, prompt),
-      /rifiutata/,
+      /rejected/,
     )
 
     const refundFee = '12'
@@ -308,7 +308,7 @@ function nftSimulation() {
       if (!result) throw new RpcError('txnNotFound', true)
       return result
     }
-    if (command !== 'submit') throw new Error('RPC inatteso ' + command)
+    if (command !== 'submit') throw new Error('Unexpected RPC ' + command)
 
     const blob = String(params.tx_blob)
     const tx = decode(blob)
@@ -342,7 +342,7 @@ function nftSimulation() {
     if (tx.TransactionType === 'NFTokenAcceptOffer') {
       const offerId = String(tx.NFTokenSellOffer)
       const stored = offers.get(offerId)
-      if (!stored) throw new Error('Offerta assente')
+      if (!stored) throw new Error('Offer missing')
       const { LedgerEntryType, ...offer } = stored
       offers.delete(offerId)
       issued.get(String(offer.NFTokenID))!.holder = String(tx.Account)
@@ -400,7 +400,7 @@ function objectClient(kind: 'actNotFound' | 'escrow', payment?: ReturnType<typeo
     async request(req) {
       if (req.command !== 'account_objects') throw new Error(req.command)
       if (kind === 'actNotFound') throw new RippledError('actNotFound', { error: 'actNotFound' })
-      if (!payment) throw new Error('ordine mancante')
+      if (!payment) throw new Error('missing order')
       return {
         result: {
           validated: true,

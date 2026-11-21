@@ -236,12 +236,12 @@ export class SimulatedXrplNode {
   private resolveSnapshot(fields: { ledger_hash?: unknown; ledger_index?: unknown }): SimLedgerSnapshot {
     if (typeof fields.ledger_hash === 'string') {
       const snap = this.snapshotsByHash.get(fields.ledger_hash.toUpperCase())
-      if (!snap) throw new Error('Snapshot ledger_hash non trovato')
+      if (!snap) throw new Error('Snapshot ledger_hash not found')
       return snap
     }
     if (typeof fields.ledger_index === 'number') {
       const snap = this.snapshotsByIndex.get(fields.ledger_index)
-      if (!snap) throw new Error('Snapshot ledger_index non trovato')
+      if (!snap) throw new Error('Snapshot ledger_index not found')
       return snap
     }
     return this.getLatestSnapshot()
@@ -319,7 +319,7 @@ export class SimulatedXrplNode {
     this.loseNextSubmitReply = false
 
     if (this.transactions.has(hash)) {
-      if (shouldDropReply) throw new Error('Risposta RPC submit persa')
+      if (shouldDropReply) throw new Error('Lost RPC submit response')
       return
     }
 
@@ -327,13 +327,13 @@ export class SimulatedXrplNode {
       if (!this.pendingBlobs.some((b) => b.blob === blob)) {
         this.pendingBlobs.push({ blob, style })
       }
-      if (shouldDropReply) throw new Error('Risposta RPC submit persa')
+      if (shouldDropReply) throw new Error('Lost RPC submit response')
       return
     }
 
     this.executeBlob(blob, style)
     if (shouldDropReply) {
-      throw new Error('Risposta RPC submit persa')
+      throw new Error('Lost RPC submit response')
     }
   }
 
@@ -646,7 +646,7 @@ export class SimulatedXrplNode {
 
   private handleRequest(command: string, fields: Fields, style: 'nft' | 'escrow'): Fields {
     if (!this.available) {
-      throw new Error('Nodo XRPL simulato non disponibile')
+      throw new Error('Simulated XRPL node unavailable')
     }
 
     switch (command) {
@@ -850,7 +850,7 @@ export class SimulatedXrplNode {
         return { engine_result: 'tesSUCCESS' }
       }
       default:
-        throw new Error(`Comando XRPL simulato non supportato: ${command}`)
+        throw new Error(`Unsupported simulated XRPL command: ${command}`)
     }
   }
 
@@ -873,7 +873,7 @@ export class SimulatedXrplNode {
         signersCount?: number,
       ): Promise<T> => {
         if (!this.available) {
-          throw new Error('Nodo XRPL simulato non disponibile')
+          throw new Error('Simulated XRPL node unavailable')
         }
         const acct = this.accounts.get(tx.Account)
         if (!acct) throw new RippledError('actNotFound', { error: 'actNotFound' })
@@ -918,7 +918,7 @@ export interface XrplRuntime {
 }
 
 function signerFromSeed(seed: string | null, label: string): LocalSigner {
-  if (!seed) throw new Error(`Seed mancante per ${label}`)
+  if (!seed) throw new Error(`Missing seed for ${label}`)
   return new LocalSigner(Wallet.fromSeed(seed))
 }
 
@@ -982,7 +982,7 @@ export async function createTestnetRuntime(options: {
   const secretsPath = join(options.stateDir, 'dev-secrets.json')
   if (!existsSync(publicPath) || !existsSync(secretsPath)) {
     throw new Error(
-      `Configurazione Testnet mancante in ${options.stateDir}. Eseguire prima: npm --prefix xrpl run setup:wallets`,
+      `Testnet configuration missing in ${options.stateDir}. Run first: npm --prefix xrpl run setup:wallets`,
     )
   }
 

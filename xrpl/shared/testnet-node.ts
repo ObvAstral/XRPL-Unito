@@ -1,11 +1,11 @@
 export type TestnetNode = 'ripple' | 'xrplLabs'
 
-/** Accetta sia `xrplLabs` (setup wallet) sia `xrpl-labs` (CLI affitti). */
+/** Accepts both `xrplLabs` (wallet setup) and `xrpl-labs` (rental CLI). */
 export function normalizeTestnetNode(value: string | undefined): TestnetNode {
   const raw = value ?? 'ripple'
   if (raw === 'ripple') return 'ripple'
   if (raw === 'xrplLabs' || raw === 'xrpl-labs') return 'xrplLabs'
-  throw new Error('Nodo Testnet non valido: usare ripple, xrplLabs oppure xrpl-labs')
+  throw new Error('Invalid Testnet node: use ripple, xrplLabs, or xrpl-labs')
 }
 
 export function testnetHttpUrl(node: TestnetNode): string {

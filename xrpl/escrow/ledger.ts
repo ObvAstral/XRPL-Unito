@@ -393,7 +393,7 @@ export class EscrowLedger {
         spendableDrops,
         masterDisabled,
         signerListConfigured: false,
-        reason: 'RegularKey individuale presente sul vault',
+        reason: 'Individual RegularKey present on vault',
       }
     }
 
@@ -406,7 +406,7 @@ export class EscrowLedger {
         spendableDrops,
         masterDisabled,
         signerListConfigured: false,
-        reason: 'Oggetto Delegate presente sul vault',
+        reason: 'Delegate object present on vault',
       }
     }
 
@@ -419,7 +419,7 @@ export class EscrowLedger {
         spendableDrops,
         masterDisabled,
         signerListConfigured: false,
-        reason: 'Piu’ SignerList rilevate sul vault',
+        reason: 'Multiple SignerLists detected on vault',
       }
     }
 
@@ -441,7 +441,7 @@ export class EscrowLedger {
           spendableDrops,
           masterDisabled,
           signerListConfigured: false,
-          reason: 'SignerList registrata diversa dai tre firmatari attesi (Quorum 2, pesi 1/1/1)',
+          reason: 'Registered SignerList differs from expected three signers (Quorum 2, weights 1/1/1)',
         }
       }
       signerListConfigured = true
@@ -453,7 +453,7 @@ export class EscrowLedger {
         spendableDrops,
         masterDisabled: true,
         signerListConfigured: false,
-        reason: 'Master key disabilitata senza SignerList registrata',
+        reason: 'Master key disabled without a registered SignerList',
       }
     }
 
@@ -503,7 +503,7 @@ export class EscrowLedger {
   ): Promise<VaultInspection> {
     validateRentalOrder(order)
     const reserves = await this.readReserves()
-    // Almeno 3 volte la fee base per sostenere il futuro Payment 2-su-3.
+    // At least 3x base fee to cover the future 2-of-3 Payment.
     const minSpendable = reserves.baseFeeDrops * 3n
     const inspection = await this.inspectVaultAccount(
       order.vault,
@@ -513,10 +513,10 @@ export class EscrowLedger {
       snapshot,
     )
     if (inspection.state === 'mismatch') {
-      throw new VaultConfigMismatchError(order.vault, inspection.reason ?? 'Configurazione incoerente')
+      throw new VaultConfigMismatchError(order.vault, inspection.reason ?? 'Inconsistent configuration')
     }
     if (inspection.state !== 'ready') {
-      throw new Error(`Vault ${order.vault} non pronto (stato: ${inspection.state})`)
+      throw new Error(`Vault ${order.vault} not ready (state: ${inspection.state})`)
     }
     return inspection
   }
@@ -534,7 +534,7 @@ export class EscrowLedger {
       return Array.isArray(result.account_objects) && result.account_objects.length > 0
     } catch (error) {
       const code = rippleError(error).error
-      // Nodi che non espongono ancora il filtro 'delegate' rispondono invalidParams.
+      // Nodes that do not support the 'delegate' filter yet respond with invalidParams.
       if (code === 'invalidParams') return false
       if (error instanceof LedgerUnavailable) throw error
       throw new LedgerUnavailable()
@@ -749,14 +749,14 @@ export class EscrowLedger {
         marker = result.marker
       } while (marker != null)
     } catch {
-      // L'assenza dell'oggetto senza prova di EscrowFinish non basta a certificare l'accredito.
+      // Absence of the object without EscrowFinish proof is insufficient to certify credit.
     }
     return { state: 'pending' }
   }
 
   /**
-   * Verifica che sul ledger non esista alcun oggetto Escrow attivo di Bob
-   * compatibile con (vault, netDrops, FinishAfter) il cui hash non sia stato registrato.
+   * Checks that no active Escrow object from Bob matching (vault, netDrops, FinishAfter)
+   * exists on the ledger without a recorded hash.
    */
   async hasMatchingActiveEscrowFromBob(
     order: RentalPaymentOrder,
@@ -792,8 +792,8 @@ export class EscrowLedger {
   }
 
   /**
-   * Verifica sul ledger validato che Bob abbia davvero accettato l'offerta del pass
-   * accreditando feeDrops all'ente emittente (prerequisito per il rimborso fee).
+   * Verifies on the validated ledger that Bob actually accepted the pass offer
+   * crediting feeDrops to the issuing authority (prerequisite for fee refund).
    */
   async verifyPassFeeCollected(
     order: RentalPaymentOrder,
@@ -865,8 +865,8 @@ export class EscrowLedger {
   }
 
   /**
-   * Verifica che un Payment validato abbia consegnato esattamente expectedDrops al beneficiario
-   * (senza partial payment).
+   * Verifies that a validated Payment delivered exact expectedDrops to the beneficiary
+   * (without partial payment).
    */
   async verifyValidatedPayment(
     hash: string,
@@ -888,13 +888,13 @@ export class EscrowLedger {
       transaction.Amount !== expectedDrops ||
       ((typeof transaction.Flags === 'number' ? transaction.Flags : 0) & TF_PARTIAL_PAYMENT) !== 0
     ) {
-      throw new Error('Payment validato incoerente coi termini attesi')
+      throw new Error('Validated Payment does not match expected terms')
     }
 
     const delivered = readDeliveredDrops(metadata)
     if (delivered !== expectedDrops) {
       throw new Error(
-        `delivered_amount (${delivered ?? 'assente'}) diverso dall’importo atteso (${expectedDrops})`,
+        `delivered_amount (${delivered ?? 'missing'}) differs from expected amount (${expectedDrops})`,
       )
     }
 
@@ -936,7 +936,7 @@ export class EscrowLedger {
     try {
       await this.client.request({ command: 'submit', api_version: 2, tx_blob: blob })
     } catch {
-      // L'esito si determina sempre interrogando il ledger validato, mai dalla risposta di submit.
+      // Outcome is always determined by querying the validated ledger, never from submit's reply.
     }
   }
 }

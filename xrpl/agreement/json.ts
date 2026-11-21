@@ -1,5 +1,5 @@
 export function decodeUtf8(bytes: Uint8Array): string {
-  // Preserva anche un eventuale BOM nei byte del regolamento.
+  // Preserve any BOM bytes if present in the input payload.
   return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
 }
 
@@ -9,11 +9,11 @@ export function parseExactJson(bytes: Uint8Array): unknown {
   try {
     value = JSON.parse(text)
   } catch {
-    throw new Error('JSON non valido')
+    throw new Error('Invalid JSON')
   }
 
-  // JSON.parse scarta i nomi duplicati. Sul testo già validato, un ':' segue
-  // sempre un nome di proprietà. Confrontiamo i nomi dopo il decoding JSON.
+  // JSON.parse discards duplicate keys. On validated JSON text, a ':' always
+  // follows a property name. Track property names per object scope.
   const objects: Set<string>[] = []
   let previous = ''
   for (const [token] of text.matchAll(/"(?:[^"\\]|\\.)*"|[{}:]/g)) {
@@ -22,7 +22,7 @@ export function parseExactJson(bytes: Uint8Array): unknown {
     if (token === ':') {
       const name: string = JSON.parse(previous)
       const names = objects.at(-1)!
-      if (names.has(name)) throw new Error('Proprietà JSON duplicata')
+      if (names.has(name)) throw new Error('Duplicate JSON property')
       names.add(name)
     }
     previous = token
@@ -32,8 +32,8 @@ export function parseExactJson(bytes: Uint8Array): unknown {
 
 type AgreementJson = string | number | { [key: string]: AgreementJson }
 
-// Il chiamante fornisce solo i valori dello schema validato: oggetti, interi
-// sicuri e stringhe Unicode valide. sort() ordina per code unit UTF-16 (JCS).
+// Caller supplies only validated schema values: objects, safe integers,
+// and valid Unicode strings. sort() orders by UTF-16 code unit (JCS).
 export function canonicalJson(value: AgreementJson): string {
   if (typeof value !== 'object') return JSON.stringify(value)
   const members = Object.entries(value)

@@ -17,19 +17,19 @@ function signingBytes(purpose: Purpose, message: Message): string {
 
 export function verifyWalletSignature(purpose: Purpose, message: Message, proof: unknown): string {
   if (!proof || typeof proof !== 'object' || !('publicKey' in proof) || !('signature' in proof)) {
-    throw new Error('Firma del wallet richiesta.')
+    throw new Error('Wallet signature required.')
   }
   const { publicKey, signature } = proof
   if (typeof publicKey !== 'string' || !/^(ED|02|03)[0-9A-Fa-f]{64}$/.test(publicKey)
     || typeof signature !== 'string' || !/^(?:[0-9A-Fa-f]{2}){64,72}$/.test(signature)) {
-    throw new Error('Firma del wallet non valida.')
+    throw new Error('Invalid wallet signature.')
   }
   try {
     if (verify(signingBytes(purpose, message), signature, publicKey)) return deriveAddress(publicKey)
   } catch {
-    // Le chiavi e le firme inviate dalla rete possono avere una codifica non valida.
+    // Keys and signatures received over the network may have invalid encoding.
   }
-  throw new Error('Firma del wallet non valida.')
+  throw new Error('Invalid wallet signature.')
 }
 
 export class LocalSigner {
@@ -37,7 +37,7 @@ export class LocalSigner {
 
   constructor(wallet: Wallet) {
     if (deriveAddress(wallet.publicKey) !== wallet.classicAddress) {
-      throw new Error('È richiesta la chiave principale del wallet.')
+      throw new Error('Wallet master key is required.')
     }
     this.#wallet = wallet
   }
@@ -53,12 +53,12 @@ export class LocalSigner {
     try {
       const file = fstatSync(fd)
       if (!file.isFile() || (file.mode & 0o777) !== 0o600 || file.size > 128) {
-        throw new Error('È richiesto un file seed privato con permessi 0600.')
+        throw new Error('Private seed file with 0600 permissions is required.')
       }
       try {
         return new LocalSigner(Wallet.fromSeed(readFileSync(fd, 'utf8').trim()))
       } catch {
-        throw new Error('Seed XRPL non valido.')
+        throw new Error('Invalid XRPL seed.')
       }
     } finally {
       closeSync(fd)
@@ -77,7 +77,7 @@ export class LocalSigner {
   }
 
   sign(transaction: Transaction) {
-    if (transaction.Account !== this.classicAddress) throw new Error('La transazione appartiene a un altro wallet.')
+    if (transaction.Account !== this.classicAddress) throw new Error('Transaction belongs to another wallet.')
     return this.#wallet.sign(transaction)
   }
 
@@ -88,7 +88,7 @@ export class LocalSigner {
       || typeof transaction.LastLedgerSequence !== 'number' || !Number.isInteger(transaction.LastLedgerSequence)
       || transaction.LastLedgerSequence < 1
       || transaction.Signers || transaction.TxnSignature) {
-      throw new Error('È richiesta la transazione multifirma del vault già preparata, con fee, sequenza e ledger limite.')
+      throw new Error('Prepared vault multisig transaction with fee, sequence, and last ledger sequence is required.')
     }
     return this.#wallet.sign(transaction, true)
   }

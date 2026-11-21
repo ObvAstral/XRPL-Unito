@@ -23,12 +23,12 @@ export type RentalResource = TitleTerms & { titleNftId: string; vault: string }
 function shape(value: unknown, keys: readonly string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
-    throw new Error('Sono richiesti termini JSON.')
+    throw new Error('JSON terms object required.')
   }
   const fields = Object.getOwnPropertyDescriptors(value)
   if (Reflect.ownKeys(fields).length !== keys.length
     || !keys.every((key) => fields[key]?.enumerable && Object.hasOwn(fields[key], 'value'))) {
-    throw new Error('Campi attesi: ' + keys.join(', '))
+    throw new Error('Expected fields: ' + keys.join(', '))
   }
   return value as Record<string, unknown>
 }
@@ -36,25 +36,25 @@ function shape(value: unknown, keys: readonly string[]): Record<string, unknown>
 function id(value: unknown): string {
   if (typeof value !== 'string' || !value || value.length > 128 || value.trim() !== value
     || toUSVString(value) !== value || /[\p{Cc}\p{Bidi_Control}]/u.test(value)) {
-    throw new Error('Identificativo applicativo non valido.')
+    throw new Error('Invalid application identifier.')
   }
   return value
 }
 
 function address(value: unknown): string {
-  if (typeof value !== 'string' || !isValidClassicAddress(value)) throw new Error('Indirizzo XRPL non valido.')
+  if (typeof value !== 'string' || !isValidClassicAddress(value)) throw new Error('Invalid XRPL address.')
   return value
 }
 
 function utc(value: unknown): string {
-  if (typeof value !== 'string') throw new Error('Istante UTC richiesto.')
+  if (typeof value !== 'string') throw new Error('UTC timestamp required.')
   rippleTime(value)
   return value
 }
 
 function integer(value: unknown, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error('Intero fuori intervallo.')
+    throw new Error('Integer out of range.')
   }
   return value
 }
@@ -69,18 +69,18 @@ export function readTitle(value: unknown): TitleTerms {
     resourceId: id(title.resourceId), issuer: address(title.issuer), alice: address(title.alice),
     validFrom: utc(title.validFrom), validTo: utc(title.validTo),
   }
-  if (result.issuer === result.alice || result.validFrom >= result.validTo) throw new Error('Termini del titolo non validi.')
+  if (result.issuer === result.alice || result.validFrom >= result.validTo) throw new Error('Invalid title terms.')
   return result
 }
 
 function splitPrice(price: unknown, bps: number) {
   if (typeof price !== 'string' || !/^[1-9]\d{0,17}$/.test(price) || BigInt(price) > 100_000_000_000_000_000n) {
-    throw new Error('Prezzo in drops non valido.')
+    throw new Error('Invalid price in drops.')
   }
   const total = BigInt(price)
   const fee = total * BigInt(bps) / 10_000n
   const net = total - fee
-  if (fee < 1n || net < 1n) throw new Error('Fee e netto devono valere almeno un drop.')
+  if (fee < 1n || net < 1n) throw new Error('Fee and net must each be at least one drop.')
   return { priceDrops: price, feeDrops: fee.toString(), netDrops: net.toString() }
 }
 
@@ -90,7 +90,7 @@ export function readProposal(input: unknown) {
     'issuer', 'alice', 'startsAt', 'endsAt', 'priceDrops', 'feeBps', 'splitRule',
   ])
   if (value.protocol !== proposalProtocol || value.version !== version || value.network !== network || value.splitRule !== splitRule) {
-    throw new Error('Protocollo, rete o regola di riparto della proposta non supportati.')
+    throw new Error('Unsupported proposal protocol, network, or split rule.')
   }
   const feeBps = integer(value.feeBps, 1, 9999)
   const { priceDrops } = splitPrice(value.priceDrops, feeBps)
@@ -102,7 +102,7 @@ export function readProposal(input: unknown) {
     startsAt: utc(value.startsAt), endsAt: utc(value.endsAt), priceDrops, feeBps,
   }
   if (proposal.startsAt >= proposal.endsAt || proposal.alice === proposal.issuer) {
-    throw new Error('Intervallo o soggetti dell’affitto non validi.')
+    throw new Error('Invalid rental interval or parties.')
   }
   return proposal
 }
@@ -110,7 +110,7 @@ export function readProposal(input: unknown) {
 export function readOrder(input: unknown) {
   const value = shape(input, ['protocol', 'version', 'network', 'orderId', 'proposalHash', 'bob', 'vault', 'fundBy'])
   if (value.protocol !== orderProtocol || value.version !== version || value.network !== network) {
-    throw new Error('Protocollo o rete dell’ordine non supportati.')
+    throw new Error('Unsupported order protocol or network.')
   }
   return {
     protocol: orderProtocol, version, network, orderId: id(value.orderId),
@@ -127,20 +127,20 @@ export type RentalBundle = SignedProposal & { acceptance: SignedOrder }
 
 function authenticateProposal(proposal: RentalProposal, proof: unknown) {
   if (verifyWalletSignature('rental-proposal', proposal, proof) !== proposal.alice) {
-    throw new Error('Firma di Alice non corrispondente all’indirizzo della proposta.')
+    throw new Error('Alice signature does not match the proposal address.')
   }
 }
 
 function checkOrder(proposal: RentalProposal, order: RentalOrder) {
   if (order.proposalHash !== digestTerms(proposal) || order.fundBy > proposal.startsAt
     || new Set([proposal.alice, proposal.issuer, order.bob, order.vault]).size !== 4) {
-    throw new Error('Ordine incompatibile con la proposta firmata.')
+    throw new Error('Order incompatible with signed proposal.')
   }
 }
 
 export function signProposal(input: unknown, signer: LocalSigner): SignedProposal {
   const proposal = readProposal(input)
-  if (signer.classicAddress !== proposal.alice) throw new Error('La proposta deve essere firmata da Alice.')
+  if (signer.classicAddress !== proposal.alice) throw new Error('Proposal must be signed by Alice.')
   return { proposal, proof: signer.signMessage('rental-proposal', proposal) }
 }
 
@@ -149,7 +149,7 @@ export function signOrder(signed: SignedProposal, input: unknown, signer: LocalS
   authenticateProposal(proposal, signed.proof)
   const order = readOrder(input)
   checkOrder(proposal, order)
-  if (signer.classicAddress !== order.bob) throw new Error('L’ordine deve essere firmato da Bob.')
+  if (signer.classicAddress !== order.bob) throw new Error('Order must be signed by Bob.')
   return { order, proof: signer.signMessage('rental-order', order) }
 }
 
@@ -160,14 +160,14 @@ export function verifyRental(bundle: RentalBundle, resource: RentalResource) {
   authenticateProposal(proposal, bundle.proof)
   checkOrder(proposal, order)
   if (verifyWalletSignature('rental-order', order, bundle.acceptance.proof) !== order.bob) {
-    throw new Error('Firma di Bob non corrispondente all’indirizzo dell’ordine.')
+    throw new Error('Bob signature does not match the order address.')
   }
   const { titleNftId, vault, ...titleInput } = resource
   const title = readTitle(titleInput)
   if (title.resourceId !== proposal.resourceId || title.issuer !== proposal.issuer
     || title.alice !== proposal.alice || readHash(titleNftId) !== proposal.titleNftId
     || vault !== order.vault || proposal.startsAt < title.validFrom || proposal.endsAt > title.validTo) {
-    throw new Error('Termini incompatibili con il titolo o il vault registrato.')
+    throw new Error('Terms incompatible with registered title or vault.')
   }
 
   const { feeDrops, netDrops } = splitPrice(proposal.priceDrops, proposal.feeBps)

@@ -145,7 +145,7 @@ function createOrderTestRig(t: TestContext) {
       const offerSeq = Number(tx.OfferSequence)
       const objectId = hashes.hashEscrow(owner, offerSeq).toUpperCase()
       const escrow = escrows.get(objectId)
-      if (!escrow) throw new Error('Escrow inesistente in EscrowFinish simulato')
+      if (!escrow) throw new Error('Escrow missing in simulated EscrowFinish')
       escrows.delete(objectId)
       balances.set(
         escrow.Destination,
@@ -362,7 +362,7 @@ function createOrderTestRig(t: TestContext) {
           submittedBlobs.push(req.tx_blob)
           if (failNextSubmit) {
             failNextSubmit = false
-            throw new Error('Timeout di trasporto RPC simulato')
+            throw new Error('Simulated RPC transport timeout')
           }
           if (autoValidateSubmits) {
             executeBlobOnLedger(req.tx_blob)
@@ -370,7 +370,7 @@ function createOrderTestRig(t: TestContext) {
           return { result: { engine_result: 'tesSUCCESS' } } as never
         }
         default:
-          throw new Error(`Richiesta RPC non gestita nel test: ${req.command}`)
+          throw new Error(`Unhandled RPC request in test: ${req.command}`)
       }
     },
     async autofill<T extends SubmittableTransaction>(tx: T, signersCount?: number): Promise<T> {
@@ -426,7 +426,7 @@ function createOrderTestRig(t: TestContext) {
   }
 }
 
-test('calcola il riparto intero 10 / 1 / 9 XRP e valida i vincoli di calendario e indirizzi', () => {
+test('computes integer 10 / 1 / 9 XRP split and validates calendar and address constraints', () => {
   const split = splitRentalAmount('10000000', 1000)
   assert.deepEqual(split, {
     grossDrops: '10000000',
@@ -434,18 +434,18 @@ test('calcola il riparto intero 10 / 1 / 9 XRP e valida i vincoli di calendario 
     feeDrops: '1000000',
     netDrops: '9000000',
   })
-  assert.throws(() => splitRentalAmount('5', 1000), /almeno 1 drop/)
+  assert.throws(() => splitRentalAmount('5', 1000), /at least 1 drop/)
   assert.throws(() => splitRentalAmount('10000000', 0), /feeBps/)
   assert.throws(() => splitRentalAmount('10000000', 10000), /feeBps/)
 })
 
-test('affitto CAD completo da 10 XRP: deposito 9 XRP senza Condition/CancelAfter, rifiuto sblocco anticipato, EscrowFinish e liquidazione 2-su-3 ad Alice', async (t) => {
+test('full 10 XRP CAD rental: 9 XRP deposit without Condition/CancelAfter, early release rejected, EscrowFinish, and 2-of-3 settlement to Alice', async (t) => {
   const rig = createOrderTestRig(t)
   const order = buildOrderFixture(rig.nowSec)
   const aliceBalanceBefore = rig.balances.get(alice.classicAddress)!
   const vaultBalanceBefore = rig.balances.get(cadVault.classicAddress)!
 
-  // 1. Bob accetta il pass (1 XRP all'ente) e deposita i 9 XRP nell'escrow temporale verso il vault.
+  // 1. Bob accepts the pass (1 XRP to authority) and deposits 9 XRP into the time-locked escrow toward the vault.
   rig.recordPassAcceptance(order)
   const depositRes = await rig.service.deposit(order, createWalletSigner(bob))
   assert.equal(depositRes.state, 'validated')
@@ -459,7 +459,7 @@ test('affitto CAD completo da 10 XRP: deposito 9 XRP senza Condition/CancelAfter
   assert.equal(decodedDeposit.CancelAfter, undefined)
   assert.equal(decodedDeposit.FinishAfter, toRippleTime(order.endAt))
 
-  // Finche' non scade FinishAfter, l'escrow e' locked e lo sblocco anticipato viene respinto.
+  // Until FinishAfter expires, the escrow is locked and early release is rejected.
   const lockedCheck = await rig.ledger.verifyEscrow(
     { ...order, createHash: depositRes.hash },
     rig.currentLedgerHash,
@@ -467,10 +467,10 @@ test('affitto CAD completo da 10 XRP: deposito 9 XRP senza Condition/CancelAfter
   assert.equal(lockedCheck.state, 'locked')
   await assert.rejects(
     rig.service.releaseToVault(order, depositRes.hash, createWalletSigner(operator)),
-    /non ancora sbloccabile/,
+    /not yet releasable/,
   )
 
-  // 2. Scade il periodo d'uso: l'escrow diventa releasable e l'account operativo invia EscrowFinish.
+  // 2. Usage period ends: escrow becomes releasable and operator submits EscrowFinish.
   rig.setCloseTime(toRippleTime(order.endAt) + 1)
   const releasableCheck = await rig.ledger.verifyEscrow(
     { ...order, createHash: depositRes.hash },
@@ -487,13 +487,13 @@ test('affitto CAD completo da 10 XRP: deposito 9 XRP senza Condition/CancelAfter
   assert.equal(releaseRes.release?.amountDrops, '9000000')
   assert.equal(rig.balances.get(cadVault.classicAddress), vaultBalanceBefore + 9_000_000n)
 
-  // Finche' il vault non liquida il netto, il vault non puo' ancora essere liberato per altri ordini.
+  // Until the vault settles the net amount, the vault cannot yet be freed for other orders.
   assert.equal((await rig.service.reconcileOrder(order.orderId)).canReleaseVault, false)
 
-  // 3. Liquidazione 2 su 3 asincrona: una sola firma lascia lo stato in awaiting_signatures.
+  // 3. Asynchronous 2-of-3 settlement: a single signature keeps phase in awaiting_signatures.
   const draft = await rig.service.prepareVaultPayout(order, depositRes.hash, 'ordinary')
   assert.equal(draft.phase, 'awaiting_signatures')
-  assert.equal(draft.feeDrops, '30') // 10 * (1 + 2 firmatari)
+  assert.equal(draft.feeDrops, '30') // 10 * (1 + 2 signers)
 
   const alicePartial = await createWalletSigner(alice).signForMultisig(draft.preparedTransaction, {
     orderId: order.orderId,
@@ -506,11 +506,11 @@ test('affitto CAD completo da 10 XRP: deposito 9 XRP senza Condition/CancelAfter
   assert.deepEqual(afterFirstSig.collectedSigners, [alice.classicAddress])
   assert.equal(rig.balances.get(alice.classicAddress), aliceBalanceBefore)
 
-  // Un reinvio della stessa firma di Alice non completa il quorum.
+  // Resubmitting the same Alice signature does not satisfy quorum.
   const duplicateAlice = await rig.service.addVaultSignature(order, alicePartial.tx_blob)
   assert.equal(duplicateAlice.phase, 'awaiting_signatures')
 
-  // La seconda firma di Bob completa il quorum, invia il Payment multifirma e accredita tutti i 9 XRP ad Alice.
+  // Bob's second signature completes quorum, submits multisig Payment, and credits all 9 XRP to Alice.
   const bobPartial = await createWalletSigner(bob).signForMultisig(draft.preparedTransaction, {
     orderId: order.orderId,
     action: 'vault_payout',
@@ -523,12 +523,12 @@ test('affitto CAD completo da 10 XRP: deposito 9 XRP senza Condition/CancelAfter
   assert.equal(settled.payment.deliveredDrops, '9000000')
 
   assert.equal(rig.balances.get(alice.classicAddress), aliceBalanceBefore + 9_000_000n)
-  // Il costo di rete di 30 drops e' interamente a carico della provvista del vault.
+  // The 30-drop network fee is paid entirely out of the vault's reserve margin.
   assert.equal(rig.balances.get(cadVault.classicAddress), vaultBalanceBefore - 30n)
   assert.equal((await rig.service.reconcileOrder(order.orderId)).canReleaseVault, true)
 })
 
-test('arbitrato 2-su-3: firme di Bob ed Ente restituiscono i 9 XRP a Bob lasciando la fee di 1 XRP all’ente', async (t) => {
+test('2-of-3 arbitration: Bob and Authority signatures return 9 XRP to Bob while leaving 1 XRP fee with authority', async (t) => {
   const rig = createOrderTestRig(t)
   const order = buildOrderFixture(rig.nowSec, {
     orderId: 'order-arbitration-1',
@@ -548,14 +548,14 @@ test('arbitrato 2-su-3: firme di Bob ed Ente restituiscono i 9 XRP a Bob lascian
   assert.equal(draft.phase, 'awaiting_signatures')
   assert.equal(draft.beneficiary, bob.classicAddress)
 
-  // Nel verdetto arbitration_bob i firmatari autorizzati sono [authority, bob]; una firma di Alice viene rifiutata.
+  // Under arbitration_bob the allowed signers are [authority, bob]; an Alice signature is rejected.
   const unauthorizedAlice = await createWalletSigner(alice).signForMultisig(
     draft.preparedTransaction,
     { orderId: order.orderId, action: 'vault_payout', feeDrops: draft.feeDrops, summary: {} },
   )
   await assert.rejects(
     rig.service.addVaultSignature(order, unauthorizedAlice.tx_blob),
-    /non autorizzato/,
+    /not authorized/,
   )
 
   const verdict = await rig.service.settleVault(
@@ -569,14 +569,14 @@ test('arbitrato 2-su-3: firme di Bob ed Ente restituiscono i 9 XRP a Bob lascian
   assert.equal(verdict.payment.beneficiary, bob.classicAddress)
   assert.equal(verdict.payment.deliveredDrops, '9000000')
   assert.equal(rig.balances.get(bob.classicAddress), bobBalanceAfterDeposit + 9_000_000n)
-  // L'ente mantiene per intero la fee da 1 XRP incassata alla consegna del pass.
+  // The authority retains the full 1 XRP fee collected on pass delivery.
   assert.equal(rig.balances.get(cadAuthority.classicAddress), authorityBalanceAfterFee)
 })
 
-test('checkout interrotto: blocca rimborsi su offerte scadute o depositi pendenti ed esegue un solo rimborso fee quando il deposito manca', async (t) => {
+test('interrupted checkout: blocks refunds on expired offers or pending deposits and executes a single fee refund when deposit is absent', async (t) => {
   const rig = createOrderTestRig(t)
 
-  // Caso A: Offerta scaduta senza accettazione -> nessun incasso fee -> nessun rimborso ammesso.
+  // Case A: Offer expired unaccepted -> no fee collected -> no refund allowed.
   const unacceptedOrder = buildOrderFixture(rig.nowSec, {
     orderId: 'order-expired-offer',
     agreementHash: '3'.repeat(64),
@@ -584,10 +584,10 @@ test('checkout interrotto: blocca rimborsi su offerte scadute o depositi pendent
   rig.setCloseTime(toRippleTime(unacceptedOrder.checkoutDeadline) + 5)
   await assert.rejects(
     rig.service.refundFee(unacceptedOrder, 'A'.repeat(64), createWalletSigner(cadAuthority)),
-    /Nessun incasso fee verificato/,
+    /No verified fee collection/,
   )
 
-  // Caso B: Pass pagato (1 XRP), invio deposito in sospeso -> rimborso bloccato finche' il deposito non scade davvero.
+  // Case B: Pass paid (1 XRP), deposit submission in flight -> refund blocked until deposit actually expires.
   const abandonedOrder = buildOrderFixture(rig.nowSec + 200, {
     orderId: 'order-abandoned-checkout',
     agreementHash: '4'.repeat(64),
@@ -600,13 +600,13 @@ test('checkout interrotto: blocca rimborsi su offerte scadute o depositi pendent
   assert.equal(pendingDeposit.state, 'pending')
 
   rig.setCloseTime(toRippleTime(abandonedOrder.checkoutDeadline) + 10)
-  // Finche' LastLedgerSequence del deposito non e' superato, il tentativo resta pending e refundFee si rifiuta.
+  // Until deposit LastLedgerSequence passes, attempt stays pending and refundFee refuses.
   await assert.rejects(
     rig.service.refundFee(abandonedOrder, acceptHash, createWalletSigner(cadAuthority)),
-    /ancora in verifica/,
+    /still verifying/,
   )
 
-  // Superato LastLedgerSequence con cronologia completa, il tentativo di deposito viene marcato expired.
+  // Once LastLedgerSequence passes with full history, deposit attempt is marked expired.
   rig.advanceLedger(20)
   rig.setAutoValidateSubmits(true)
 
@@ -620,20 +620,20 @@ test('checkout interrotto: blocca rimborsi su offerte scadute o depositi pendent
   assert.equal(refund1.payment?.deliveredDrops, '1000000')
   assert.equal(rig.balances.get(bob.classicAddress), bobBeforeRefund + 1_000_000n)
 
-  // Doppio click o riavvio del processo non invia mai un secondo rimborso della stessa fee.
+  // Double click or process restart never issues a second refund for the same fee.
   const reopened = rig.reopenService()
   const refund2 = await reopened.refundFee(
     abandonedOrder,
     acceptHash,
     createWalletSigner(cadAuthority, async () => {
-      throw new Error('Non deve chiedere una seconda firma per il rimborso')
+      throw new Error('Must not ask for a second signature for the refund')
     }),
   )
   assert.equal(refund2.hash, refund1.hash)
   assert.equal(rig.balances.get(bob.classicAddress), bobBeforeRefund + 1_000_000n)
 })
 
-test('resilienza rete e concorrenza: due depositi simultanei condividono il tentativo e un riavvio riconcilia senza rifirmare', async (t) => {
+test('network resilience and concurrency: two concurrent deposits share one attempt and restart reconciles without re-signing', async (t) => {
   const rig = createOrderTestRig(t)
   const order = buildOrderFixture(rig.nowSec, {
     orderId: 'order-network-resilience',
@@ -657,19 +657,19 @@ test('resilienza rete e concorrenza: due depositi simultanei condividono il tent
   assert.equal(d1.state, 'pending')
   assert.equal(signCalls, 1)
 
-  // Il nodo riceve e valida il blob dopo il riavvio del processo: nessuna seconda firma richiesta.
+  // Node receives and validates the blob after process restart: no second signature requested.
   const resumed = rig.reopenService()
   rig.setAutoValidateSubmits(true)
   const retried = await resumed.deposit(
     order,
     createWalletSigner(bob, async () => {
-      throw new Error('Non deve rifirmare un tentativo gia’ registrato')
+      throw new Error('Must not re-sign an already recorded attempt')
     }),
   )
   assert.equal(retried.hash, d1.hash)
   assert.equal(retried.state, 'validated')
 
-  // Se il ledger non e' validato, verifyEscrow solleva LedgerUnavailable (503 per il backend di C).
+  // If the ledger is unvalidated, verifyEscrow throws LedgerUnavailable (503 for Person C's backend).
   rig.setLedgerValidated(false)
   await assert.rejects(
     rig.ledger.verifyEscrow({ ...order, createHash: d1.hash }, rig.currentLedgerHash),
@@ -677,7 +677,7 @@ test('resilienza rete e concorrenza: due depositi simultanei condividono il tent
   )
 })
 
-test('timeout sulla multifirma 2-su-3, scadenza LastLedgerSequence e blocco rimborso se esiste Escrow attivo non registrato', async (t) => {
+test('2-of-3 multisig timeout, LastLedgerSequence expiry, and refund block when unrecorded active Escrow exists', async (t) => {
   const rig = createOrderTestRig(t)
   const order = buildOrderFixture(rig.nowSec, {
     orderId: 'order-multisig-timeout',
@@ -687,7 +687,7 @@ test('timeout sulla multifirma 2-su-3, scadenza LastLedgerSequence e blocco rimb
   const acceptHash = rig.recordPassAcceptance(order)
   const depositRes = await rig.service.deposit(order, createWalletSigner(bob))
 
-  // Se sul ledger esiste l'oggetto Escrow attivo di Bob, refundFee blocca il rimborso anche omettendo createHash sull'ordine.
+  // If Bob has an active matching Escrow object on ledger, refundFee blocks refund even if createHash is omitted on order.
   rig.setCloseTime(toRippleTime(order.checkoutDeadline) + 5)
   const freshInstanceDir = mkdtempSync(join(tmpdir(), 'ixh26-unrecorded-'))
   const freshStore = new AttemptStore(freshInstanceDir)
@@ -698,10 +698,10 @@ test('timeout sulla multifirma 2-su-3, scadenza LastLedgerSequence e blocco rimb
   const isolatedService = new EscrowService(rig.ledger, freshStore)
   await assert.rejects(
     isolatedService.refundFee(order, acceptHash, createWalletSigner(cadAuthority)),
-    /oggetto Escrow attivo di Bob/,
+    /active Escrow object belonging to Bob/,
   )
 
-  // Sblocca l'escrow a maturazione e simula un timeout su submit del Payment multifirma.
+  // Release escrow at maturity and simulate timeout on multisig Payment submit.
   rig.setCloseTime(toRippleTime(order.endAt) + 5)
   await rig.service.releaseToVault(order, depositRes.hash, createWalletSigner(operator))
 
@@ -716,7 +716,7 @@ test('timeout sulla multifirma 2-su-3, scadenza LastLedgerSequence e blocco rimb
   )
   assert.equal(pendingPayout.phase, 'awaiting_ledger')
 
-  // Finche' non scade LastLedgerSequence, prepareVaultPayout mantiene awaiting_ledger senza chiedere nuove firme.
+  // Until LastLedgerSequence expires, prepareVaultPayout stays awaiting_ledger without requesting fresh signatures.
   const stillPending = await rig.service.prepareVaultPayout(
     order,
     depositRes.hash,
@@ -725,7 +725,7 @@ test('timeout sulla multifirma 2-su-3, scadenza LastLedgerSequence e blocco rimb
   assert.equal(stillPending.phase, 'awaiting_ledger')
   assert.equal(stillPending.attempt.hash, pendingPayout.attempt.hash)
 
-  // Superato LastLedgerSequence senza validazione sul ledger, il tentativo diventa expired e permette una nuova preparazione.
+  // After LastLedgerSequence passes without ledger validation, attempt expires and allows re-preparation.
   rig.advanceLedger(65)
   const expiredCheck = await rig.service.prepareVaultPayout(
     order,

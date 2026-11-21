@@ -254,14 +254,14 @@ export class RentalPlatformService {
       confirm: async () => true,
     })
     if (issued.status !== 'validated') {
-      throw new Error(`Emissione titolo iniziale fallita per ${params.resourceId}: ${issued.status}`)
+      throw new Error(`Initial title issuance failed for ${params.resourceId}: ${issued.status}`)
     }
     const accepted = await this.runtime.rentalNfts.acceptTitle(terms, issued, {
       signer: params.aliceSigner,
       confirm: async () => true,
     })
     if (accepted.status !== 'validated') {
-      throw new Error(`Accettazione titolo iniziale fallita per ${params.resourceId}: ${accepted.status}`)
+      throw new Error(`Initial title acceptance failed for ${params.resourceId}: ${accepted.status}`)
     }
     return issued.nftId
   }
@@ -304,10 +304,10 @@ export class RentalPlatformService {
     const cadConfig: CatalogResourceConfig = {
       resourceId: 'cad',
       aliases: ['cad-01'],
-      displayName: 'Posto CAD · Studio Meccanica 01',
+      displayName: 'CAD Seat · Mechanics Studio 01',
       serviceType: 'cad_portal',
       scenario: 'cad',
-      authorityName: 'Fornitore CAD (simulato)',
+      authorityName: 'CAD Provider (simulated)',
       issuer: this.runtime.setup.participants.cadAuthority,
       alice: this.runtime.setup.participants.alice,
       titleNftId: cadTitleNftId,
@@ -321,10 +321,10 @@ export class RentalPlatformService {
     const bbConfig: CatalogResourceConfig = {
       resourceId: 'torino-01',
       aliases: [],
-      displayName: 'Cartellone pubblicitario · Torino 01',
+      displayName: 'Advertising Billboard · Torino 01',
       serviceType: 'digital_billboard',
       scenario: 'billboard',
-      authorityName: 'Comune di Torino (simulato)',
+      authorityName: 'Municipality of Turin (simulated)',
       issuer: this.runtime.setup.participants.billboardAuthority,
       alice: this.runtime.setup.participants.alice,
       titleNftId: bbTitleNftId,
@@ -379,7 +379,7 @@ export class RentalPlatformService {
     return { role: 'guest' }
   }
 
-  // --- Sessioni e login con firma monouso ---
+  // --- Sessions and one-time signature login ---
 
   createPendingSessionRef(): string {
     return randomBytes(24).toString('hex')
@@ -394,18 +394,18 @@ export class RentalPlatformService {
 
   verifyWalletSession(sessionRef: string, challengeId: string, proof: unknown): SessionView {
     if (!sessionRef) {
-      throw new HttpError(400, 'SESSION_REF_REQUIRED', 'Riferimento sessione mancante.')
+      throw new HttpError(400, 'SESSION_REF_REQUIRED', 'Missing session reference.')
     }
     const pending = this.store.getSession(sessionRef, this.runtime.nowMillis())
     if (!pending) {
-      throw new HttpError(401, 'SESSION_INVALID', 'Sessione in attesa inesistente o scaduta.')
+      throw new HttpError(401, 'SESSION_INVALID', 'Pending session does not exist or has expired.')
     }
     let address: string
     try {
       const consumed = this.walletLogin.consume(challengeId, sessionRef, proof)
       address = consumed.address
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Verifica firma login fallita.'
+      const msg = error instanceof Error ? error.message : 'Login signature verification failed.'
       throw new HttpError(401, 'LOGIN_VERIFICATION_FAILED', msg)
     }
     this.store.authenticateSession(sessionRef, address, this.runtime.nowMillis())
@@ -482,9 +482,9 @@ export class RentalPlatformService {
     readonly role?: LocalDemoRole
   }): SignedOrder {
     const listing = this.store.getListing(input.listingId)
-    if (!listing) throw new HttpError(404, 'LISTING_NOT_FOUND', 'Annuncio non trovato.')
+    if (!listing) throw new HttpError(404, 'LISTING_NOT_FOUND', 'Listing not found.')
     const rev = this.store.getListingRevision(listing.listingId, input.revision ?? listing.currentRevision)
-    if (!rev) throw new HttpError(404, 'REVISION_NOT_FOUND', 'Revisione annuncio non trovata.')
+    if (!rev) throw new HttpError(404, 'REVISION_NOT_FOUND', 'Listing revision not found.')
     const resource = this.requireResource(rev.resourceId)
     const signer = this.getSignerForRole(input.role ?? 'bob')
     const signedProposal: SignedProposal = {
@@ -524,7 +524,7 @@ export class RentalPlatformService {
       ...(order.createHash ? { createHash: order.createHash } : {}),
     })
     if (!order.createHash) {
-      throw new HttpError(409, 'NO_DEPOSIT', 'Deposito escrow non presente per questo ordine.')
+      throw new HttpError(409, 'NO_DEPOSIT', 'Escrow deposit not present for this order.')
     }
     const draft = this.runtime.attemptStore.getMultisigDraft(orderId)
     const mode = draft?.resolutionMode ?? 'ordinary'
@@ -534,7 +534,7 @@ export class RentalPlatformService {
       mode,
     )
     if (progress.phase !== 'awaiting_signatures') {
-      throw new HttpError(409, 'PAYOUT_NOT_AWAITING_SIGNATURES', `Stato liquidazione: ${progress.phase}`)
+      throw new HttpError(409, 'PAYOUT_NOT_AWAITING_SIGNATURES', `Settlement status: ${progress.phase}`)
     }
     const signer = this.getSignerForRole(role)
     const roleSigner = adaptLocalSigner(signer)
@@ -551,13 +551,13 @@ export class RentalPlatformService {
     })
   }
 
-  // --- Catalogo, Annunci e Ordini ---
+  // --- Catalog, Listings, and Orders ---
 
   requireResource(rawId: string): CatalogResourceConfig {
     const normalized = normalizeCatalogResourceId(rawId)
     const resource = this.store.getResource(normalized) ?? this.store.getResource(rawId)
     if (!resource) {
-      throw new HttpError(404, 'RESOURCE_NOT_FOUND', `Risorsa sconosciuta: ${rawId}`)
+      throw new HttpError(404, 'RESOURCE_NOT_FOUND', `Unknown resource: ${rawId}`)
     }
     return resource
   }
@@ -565,7 +565,7 @@ export class RentalPlatformService {
   requireOrder(orderId: string): OrderRecord {
     const order = this.store.getOrder(orderId)
     if (!order) {
-      throw new HttpError(404, 'ORDER_NOT_FOUND', `Ordine non trovato: ${orderId}`)
+      throw new HttpError(404, 'ORDER_NOT_FOUND', `Order not found: ${orderId}`)
     }
     return order
   }
@@ -577,12 +577,12 @@ export class RentalPlatformService {
   async getResourceFunds(sessionRef: string | null, resourceId: string): Promise<ResourceFundsView> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collega il wallet per vedere i saldi.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect your wallet to view balances.')
     }
     const resource = this.requireResource(resourceId)
     const bobAddress = this.runtime.setup.participants.bob
     if (![resource.alice, bobAddress, resource.issuer].includes(session.address)) {
-      throw new HttpError(403, 'FORBIDDEN_FUNDS', 'Il wallet collegato non è un partecipante per questa risorsa.')
+      throw new HttpError(403, 'FORBIDDEN_FUNDS', 'The connected wallet is not a participant for this resource.')
     }
 
     const orders = this.store.listOrders(resource.resourceId)
@@ -608,7 +608,7 @@ export class RentalPlatformService {
       return { resourceId: resource.resourceId, ledgerIndex: snapshot.index, accounts: { alice, bob, vault }, escrow, payout }
     } catch (error) {
       if (error instanceof LedgerUnavailable) {
-        throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'Saldi temporaneamente indisponibili.')
+        throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'Balances temporarily unavailable.')
       }
       throw error
     }
@@ -654,37 +654,37 @@ export class RentalPlatformService {
   ): { readonly listing: ListingRecord; readonly revision: ListingRevisionRecord } {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare il wallet di Alice per pubblicare un annuncio.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect Alice’s wallet to publish a listing.')
     }
     let proposal: RentalProposal
     try {
       proposal = readProposal(body.proposal)
     } catch (error) {
-      throw new HttpError(400, 'INVALID_PROPOSAL', error instanceof Error ? error.message : 'Proposta non valida.')
+      throw new HttpError(400, 'INVALID_PROPOSAL', error instanceof Error ? error.message : 'Invalid proposal.')
     }
     const resource = this.requireResource(proposal.resourceId)
     if (session.address !== resource.alice || proposal.alice !== resource.alice) {
-      throw new HttpError(403, 'FORBIDDEN_LISTING', 'Solo il wallet titolare Alice può pubblicare per questa risorsa.')
+      throw new HttpError(403, 'FORBIDDEN_LISTING', 'Only the owner wallet Alice can publish for this resource.')
     }
     if (
       proposal.titleNftId !== resource.titleNftId ||
       proposal.issuer !== resource.issuer ||
       proposal.feeBps !== resource.feeBps
     ) {
-      throw new HttpError(400, 'RESOURCE_MISMATCH', 'Titolo principale, emittente o feeBps non corrispondono al catalogo.')
+      throw new HttpError(400, 'RESOURCE_MISMATCH', 'Base title, issuer, or feeBps do not match catalog.')
     }
     if (proposal.startsAt < resource.validFrom || proposal.endsAt > resource.validTo) {
-      throw new HttpError(400, 'OUTSIDE_TITLE_VALIDITY', 'L’intervallo proposto eccede la validità del titolo principale.')
+      throw new HttpError(400, 'OUTSIDE_TITLE_VALIDITY', 'The proposed interval exceeds the base title validity.')
     }
     try {
       if (verifyWalletSignature('rental-proposal', proposal, body.proof) !== proposal.alice) {
-        throw new Error('Firma di Alice non corrispondente all’indirizzo della proposta.')
+        throw new Error('Alice’s signature does not match the proposal address.')
       }
     } catch (error) {
       throw new HttpError(
         400,
         'INVALID_PROPOSAL_SIGNATURE',
-        error instanceof Error ? error.message : 'Firma di Alice non valida.',
+        error instanceof Error ? error.message : 'Invalid Alice signature.',
       )
     }
 
@@ -710,7 +710,7 @@ export class RentalPlatformService {
         nowUtc: this.nowUtc(),
       })
     } catch (error) {
-      throw new HttpError(400, 'REVISION_CONFLICT', error instanceof Error ? error.message : 'Revisione non valida.')
+      throw new HttpError(400, 'REVISION_CONFLICT', error instanceof Error ? error.message : 'Invalid revision.')
     }
   }
 
@@ -721,38 +721,38 @@ export class RentalPlatformService {
   ): Promise<OrderView> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare il wallet di Bob per accettare la proposta.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect Bob’s wallet to accept the proposal.')
     }
     const listing = this.store.getListing(listingId)
     if (!listing) {
-      throw new HttpError(404, 'LISTING_NOT_FOUND', 'Annuncio non trovato.')
+      throw new HttpError(404, 'LISTING_NOT_FOUND', 'Listing not found.')
     }
     let parsedOrder: ReturnType<typeof readOrder>
     try {
       parsedOrder = readOrder(acceptance?.order)
     } catch (error) {
-      throw new HttpError(400, 'INVALID_ORDER', error instanceof Error ? error.message : 'Ordine non valido.')
+      throw new HttpError(400, 'INVALID_ORDER', error instanceof Error ? error.message : 'Invalid order.')
     }
     if (session.address !== parsedOrder.bob) {
-      throw new HttpError(403, 'FORBIDDEN_ORDER', 'La sessione autenticata non corrisponde al wallet di Bob nell’ordine.')
+      throw new HttpError(403, 'FORBIDDEN_ORDER', 'The authenticated session does not match Bob’s wallet in the order.')
     }
 
     const activeRev = this.store.getListingRevision(listing.listingId, listing.currentRevision)
     if (!activeRev) {
-      throw new HttpError(404, 'REVISION_NOT_FOUND', 'Revisione corrente mancante.')
+      throw new HttpError(404, 'REVISION_NOT_FOUND', 'Current revision missing.')
     }
     if (activeRev.status === 'rejected') {
       throw new HttpError(
         409,
         'REVISION_REJECTED',
-        'Questa revisione è stata rifiutata dall’ente: Alice deve pubblicare una nuova revisione.',
+        'This revision was rejected by the authority: Alice must publish a new revision.',
       )
     }
     if (parsedOrder.proposalHash !== activeRev.proposalHash) {
       throw new HttpError(
         409,
         'STALE_PROPOSAL_REVISION',
-        'L’accettazione non corrisponde alla revisione attiva dell’annuncio.',
+        'The acceptance does not match the active revision of the listing.',
       )
     }
 
@@ -767,7 +767,7 @@ export class RentalPlatformService {
     try {
       verified = verifyRental(bundle, toRentalResource(resource))
     } catch (error) {
-      throw new HttpError(400, 'INVALID_RENTAL_BUNDLE', error instanceof Error ? error.message : 'Accordo non valido.')
+      throw new HttpError(400, 'INVALID_RENTAL_BUNDLE', error instanceof Error ? error.message : 'Invalid agreement.')
     }
 
     const paymentOrder = toPaymentOrder(verified, resource.scenario)
@@ -776,12 +776,12 @@ export class RentalPlatformService {
       await this.runtime.escrowLedger.assertVaultReadyForOrder(paymentOrder, snapshot)
     } catch (error) {
       if (error instanceof Error && error.message.includes('LEDGER_UNAVAILABLE')) {
-        throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'Nodo XRPL non disponibile durante la verifica del vault.')
+        throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'XRPL node unavailable during vault verification.')
       }
       throw new HttpError(
         409,
         'VAULT_NOT_READY',
-        error instanceof Error ? error.message : 'Vault non pronto per ricevere un ordine.',
+        error instanceof Error ? error.message : 'Vault not ready to receive an order.',
       )
     }
 
@@ -826,7 +826,7 @@ export class RentalPlatformService {
   ): Promise<OrderView> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare il wallet dell’ente competente.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect the competent authority wallet.')
     }
     const order = this.requireOrder(orderId)
     const resource = this.requireResource(order.resourceId)
@@ -834,17 +834,17 @@ export class RentalPlatformService {
       throw new HttpError(
         403,
         'FORBIDDEN_AUTHORITY',
-        `Solo l’ente competente (${resource.authorityName}) può valutare quest’ordine.`,
+        `Only the competent authority (${resource.authorityName}) can evaluate this order.`,
       )
     }
 
     if (input.decision === 'reject') {
       if (order.status !== 'awaiting_authority') {
-        throw new HttpError(409, 'INVALID_STATE', 'L’ordine non è più in attesa di valutazione.')
+        throw new HttpError(409, 'INVALID_STATE', 'The order is no longer awaiting evaluation.')
       }
       const reason = input.reason?.trim()
       if (!reason) {
-        throw new HttpError(400, 'REASON_REQUIRED', 'Inserire una motivazione leggibile per il rifiuto.')
+        throw new HttpError(400, 'REASON_REQUIRED', 'Enter a readable reason for rejection.')
       }
       const updated = this.store.updateOrder(orderId, {
         status: 'rejected',
@@ -862,12 +862,12 @@ export class RentalPlatformService {
       if (order.status === 'approved_offer_ready') {
         return this.buildOrderView(order)
       }
-      throw new HttpError(409, 'INVALID_STATE', `Impossibile approvare ordine nello stato ${order.status}.`)
+      throw new HttpError(409, 'INVALID_STATE', `Cannot approve order in state ${order.status}.`)
     }
 
     const authoritySigner = this.getSignerByAddress(resource.issuer)
     if (!authoritySigner) {
-      throw new HttpError(500, 'MISSING_AUTHORITY_SIGNER', 'Firmatario ente non configurato.')
+      throw new HttpError(500, 'MISSING_AUTHORITY_SIGNER', 'Authority signer not configured.')
     }
 
     const bundle = JSON.parse(order.bundleJson) as RentalBundle
@@ -881,7 +881,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'ISSUE_PASS_FAILED',
-        error instanceof Error ? error.message : 'Emissione pass fallita.',
+        error instanceof Error ? error.message : 'Pass issuance failed.',
       )
     }
 
@@ -903,7 +903,7 @@ export class RentalPlatformService {
     }
 
     if (result.status === 'rejected') {
-      throw new HttpError(409, 'XRPL_REJECTED', `Transazione pass rifiutata dal ledger: ${result.code}`)
+      throw new HttpError(409, 'XRPL_REJECTED', `Pass transaction rejected by ledger: ${result.code}`)
     }
 
     const updated = this.store.updateOrder(orderId, {
@@ -925,31 +925,31 @@ export class RentalPlatformService {
   async acceptPassForOrder(sessionRef: string | null, orderId: string): Promise<OrderView> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare il wallet di Bob per ritirare il pass.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect Bob’s wallet to claim the pass.')
     }
     const order = this.requireOrder(orderId)
     if (session.address !== order.bob) {
-      throw new HttpError(403, 'FORBIDDEN_ORDER', 'Solo Bob può accettare l’offerta nominativa del pass.')
+      throw new HttpError(403, 'FORBIDDEN_ORDER', 'Only Bob can accept the named pass offer.')
     }
     if (order.status === 'awaiting_authority' || order.status === 'approved_offer_pending') {
-      throw new HttpError(409, 'WAIT_AUTHORITY', 'L’offerta nominativa del pass non è ancora validata.')
+      throw new HttpError(409, 'WAIT_AUTHORITY', 'The named pass offer is not yet validated.')
     }
     if (
       order.status !== 'approved_offer_ready' &&
       !(order.status === 'pass_delivered_unfunded' && order.acceptOfferHash)
     ) {
-      throw new HttpError(409, 'INVALID_STATE', `Stato ordine non compatibile con consegna pass: ${order.status}.`)
+      throw new HttpError(409, 'INVALID_STATE', `Order state incompatible with pass delivery: ${order.status}.`)
     }
     if (order.acceptOfferHash && order.status === 'pass_delivered_unfunded') {
       return this.buildOrderView(order)
     }
     if (!order.passNftId || !order.offerId) {
-      throw new HttpError(409, 'OFFER_NOT_READY', 'Identificativi di pass e offerta mancanti.')
+      throw new HttpError(409, 'OFFER_NOT_READY', 'Missing pass and offer identifiers.')
     }
 
     const bobSigner = this.getSignerByAddress(order.bob)
     if (!bobSigner) {
-      throw new HttpError(500, 'MISSING_BOB_SIGNER', 'Firmatario Bob non configurato.')
+      throw new HttpError(500, 'MISSING_BOB_SIGNER', 'Bob signer not configured.')
     }
     const resource = this.requireResource(order.resourceId)
     const bundle = JSON.parse(order.bundleJson) as RentalBundle
@@ -966,7 +966,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'ACCEPT_PASS_FAILED',
-        error instanceof Error ? error.message : 'Accettazione offerta pass fallita.',
+        error instanceof Error ? error.message : 'Accepting pass offer failed.',
       )
     }
 
@@ -978,7 +978,7 @@ export class RentalPlatformService {
       return this.buildOrderView(updated)
     }
     if (accepted.status === 'rejected') {
-      throw new HttpError(409, 'XRPL_REJECTED', `Accettazione pass rifiutata dal ledger: ${accepted.code}`)
+      throw new HttpError(409, 'XRPL_REJECTED', `Pass acceptance rejected by ledger: ${accepted.code}`)
     }
 
     const updated = this.store.updateOrder(orderId, {
@@ -995,11 +995,11 @@ export class RentalPlatformService {
   async depositEscrowForOrder(sessionRef: string | null, orderId: string): Promise<OrderView> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare il wallet di Bob per firmare il deposito escrow.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect Bob’s wallet to sign the escrow deposit.')
     }
     const order = this.requireOrder(orderId)
     if (session.address !== order.bob) {
-      throw new HttpError(403, 'FORBIDDEN_ORDER', 'Solo Bob può firmare il deposito escrow per quest’ordine.')
+      throw new HttpError(403, 'FORBIDDEN_ORDER', 'Only Bob can sign the escrow deposit for this order.')
     }
     if (
       order.status !== 'pass_delivered_unfunded' &&
@@ -1009,7 +1009,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'PASS_NOT_DELIVERED',
-        'Consegnare prima il pass NFT (con incasso della fee) prima di creare il deposito.',
+        'Deliver the pass NFT first (collecting the fee) before creating the deposit.',
       )
     }
     if (order.status === 'confirmed') {
@@ -1018,7 +1018,7 @@ export class RentalPlatformService {
 
     const bobSigner = this.getSignerByAddress(order.bob)
     if (!bobSigner) {
-      throw new HttpError(500, 'MISSING_BOB_SIGNER', 'Firmatario Bob non configurato.')
+      throw new HttpError(500, 'MISSING_BOB_SIGNER', 'Bob signer not configured.')
     }
     const resource = this.requireResource(order.resourceId)
     const bundle = JSON.parse(order.bundleJson) as RentalBundle
@@ -1037,7 +1037,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'DEPOSIT_FAILED',
-        error instanceof Error ? error.message : 'Creazione deposito escrow fallita.',
+        error instanceof Error ? error.message : 'Escrow deposit creation failed.',
       )
     }
 
@@ -1057,11 +1057,11 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'DEPOSIT_REJECTED',
-        `Deposito escrow non validato (${dep.state}: ${dep.result ?? 'ignoto'}).`,
+        `Escrow deposit not validated (${dep.state}: ${dep.result ?? 'unknown'}).`,
       )
     }
 
-    // Verifica composta pass + deposito sullo stesso snapshot validato.
+    // Composite pass + deposit verification on the same validated snapshot.
     const snapshot = await this.runtime.escrowLedger.snapshot()
     const passCheck = order.passNftId
       ? await verifyRentalPass(
@@ -1085,7 +1085,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'COMPOSITE_VERIFICATION_FAILED',
-        `Verifica composta su snapshot fallita (pass=${passCheck}, escrow=${escrowCheck.state}).`,
+        `Composite snapshot verification failed (pass=${passCheck}, escrow=${escrowCheck.state}).`,
       )
     }
 
@@ -1105,7 +1105,7 @@ export class RentalPlatformService {
   async releaseEscrowForOrder(sessionRef: string | null, orderId: string): Promise<OrderView> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare un wallet partecipante per avviare lo sblocco.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect a participant wallet to initiate release.')
     }
     const order = this.requireOrder(orderId)
     if (
@@ -1114,10 +1114,10 @@ export class RentalPlatformService {
       session.address !== order.issuer &&
       session.address !== this.runtime.setup.participants.operator
     ) {
-      throw new HttpError(403, 'FORBIDDEN_ORDER', 'Solo i partecipanti all’ordine possono richiedere lo sblocco.')
+      throw new HttpError(403, 'FORBIDDEN_ORDER', 'Only order participants can request escrow release.')
     }
     if (!order.createHash) {
-      throw new HttpError(409, 'NO_ESCROW', 'Nessun deposito escrow associato a quest’ordine.')
+      throw new HttpError(409, 'NO_ESCROW', 'No escrow deposit associated with this order.')
     }
     if (order.releaseTxHash) {
       return this.buildOrderView(order)
@@ -1144,7 +1144,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'ESCROW_NOT_RELEASABLE',
-        error instanceof Error ? error.message : 'Sblocco escrow non consentito.',
+        error instanceof Error ? error.message : 'Escrow release not permitted.',
       )
     }
 
@@ -1156,7 +1156,7 @@ export class RentalPlatformService {
       return this.buildOrderView(updated)
     }
     if (rel.state !== 'validated' || !rel.release) {
-      throw new HttpError(409, 'ESCROW_FINISH_FAILED', `Sblocco escrow fallito: ${rel.result ?? rel.state}.`)
+      throw new HttpError(409, 'ESCROW_FINISH_FAILED', `Escrow release failed: ${rel.result ?? rel.state}.`)
     }
 
     const updated = this.store.updateOrder(orderId, {
@@ -1181,7 +1181,7 @@ export class RentalPlatformService {
   ): Promise<{ readonly order: OrderView; readonly progress: VaultPayoutProgress }> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare un wallet firmatario per la liquidazione del vault.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect a signer wallet for vault settlement.')
     }
     const order = this.requireOrder(orderId)
     if (
@@ -1189,10 +1189,10 @@ export class RentalPlatformService {
       session.address !== order.bob &&
       session.address !== order.issuer
     ) {
-      throw new HttpError(403, 'FORBIDDEN_SETTLEMENT', 'Wallet estraneo ai firmatari del vault.')
+      throw new HttpError(403, 'FORBIDDEN_SETTLEMENT', 'Wallet is not a vault signer.')
     }
     if (!order.createHash) {
-      throw new HttpError(409, 'NO_ESCROW', 'Nessun escrow presente per quest’ordine.')
+      throw new HttpError(409, 'NO_ESCROW', 'No escrow present for this order.')
     }
 
     const resource = this.requireResource(order.resourceId)
@@ -1218,7 +1218,7 @@ export class RentalPlatformService {
         )
       } else if (action === 'sign') {
         if (!input.partialTxBlob) {
-          throw new HttpError(400, 'PARTIAL_BLOB_REQUIRED', 'partialTxBlob mancante.')
+          throw new HttpError(400, 'PARTIAL_BLOB_REQUIRED', 'Missing partialTxBlob.')
         }
         progress = await this.runtime.escrowService.addVaultSignature(
           paymentOrder,
@@ -1247,7 +1247,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'VAULT_SETTLEMENT_ERROR',
-        error instanceof Error ? error.message : 'Liquidazione vault non riuscita.',
+        error instanceof Error ? error.message : 'Vault settlement failed.',
       )
     }
 
@@ -1293,7 +1293,7 @@ export class RentalPlatformService {
   async recoverInterruptedOrder(sessionRef: string | null, orderId: string): Promise<OrderView> {
     const session = this.getSessionView(sessionRef)
     if (!session.authenticated || !session.address) {
-      throw new HttpError(401, 'SESSION_REQUIRED', 'Collegare un wallet autorizzato per avviare il recupero.')
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Connect an authorized wallet to initiate recovery.')
     }
     let order = this.requireOrder(orderId)
     const resource = this.requireResource(order.resourceId)
@@ -1302,10 +1302,10 @@ export class RentalPlatformService {
       session.address !== order.alice &&
       session.address !== order.bob
     ) {
-      throw new HttpError(403, 'FORBIDDEN_RECOVERY', 'Wallet non autorizzato al recupero di quest’ordine.')
+      throw new HttpError(403, 'FORBIDDEN_RECOVERY', 'Wallet not authorized to recover this order.')
     }
 
-    // 1. Riconcilia eventuali invii rimasti in sospeso (NFT ed Escrow).
+    // 1. Reconcile any pending submissions (NFT and Escrow).
     order = await this.reconcilePendingOrderSteps(order)
 
     if (order.status === 'revoked_refunded' || order.status === 'revoked_unpaid' || order.status === 'rejected') {
@@ -1328,7 +1328,7 @@ export class RentalPlatformService {
       throw new HttpError(
         409,
         'CHECKOUT_STILL_OPEN',
-        'Il termine per il deposito è ancora aperto: attendere la scadenza prima della revoca.',
+        'The deposit window is still open: wait until expiration before revoking.',
       )
     }
 
@@ -1359,10 +1359,10 @@ export class RentalPlatformService {
 
     const authoritySigner = this.getSignerByAddress(resource.issuer)
     if (!authoritySigner) {
-      throw new HttpError(500, 'MISSING_AUTHORITY_SIGNER', 'Firmatario ente non configurato.')
+      throw new HttpError(500, 'MISSING_AUTHORITY_SIGNER', 'Authority signer not configured.')
     }
 
-    // 2. Burn del pass (solo se non già validato e registrato).
+    // 2. Burn pass (only if not already validated and recorded).
     let feeRefundDue = order.feeRefundDue === null ? null : order.feeRefundDue === 1
     if (order.passNftId && !order.burnTxHash) {
       let burnResult: Awaited<ReturnType<XrplRuntime['rentalNfts']['revokePass']>>
@@ -1384,7 +1384,7 @@ export class RentalPlatformService {
         throw new HttpError(
           409,
           'REVOKE_PASS_FAILED',
-          error instanceof Error ? error.message : 'Revoca pass fallita.',
+          error instanceof Error ? error.message : 'Pass revocation failed.',
         )
       }
 
@@ -1397,7 +1397,7 @@ export class RentalPlatformService {
         return this.buildOrderView(updated)
       }
       if (burnResult.status !== 'validated') {
-        throw new HttpError(409, 'BURN_REJECTED', `Burn pass rifiutato: ${burnResult.code}`)
+        throw new HttpError(409, 'BURN_REJECTED', `Pass burn rejected: ${burnResult.code}`)
       }
       feeRefundDue = burnResult.feeRefundDue === true
       order = this.store.updateOrder(orderId, {
@@ -1412,13 +1412,13 @@ export class RentalPlatformService {
       })
     }
 
-    // 3. Rimborso unico della fee se Bob aveva ritirato il pass pagando la fee.
+    // 3. Single refund of the fee if Bob claimed the pass and paid the fee.
     if (feeRefundDue === true && !order.refundTxHash) {
       if (!order.acceptOfferHash) {
         throw new HttpError(
           409,
           'MISSING_ACCEPT_RECEIPT',
-          'Ricevuta di accettazione pass mancante: impossibile verificare il rimborso fee.',
+          'Pass acceptance receipt missing: cannot verify fee refund.',
         )
       }
       let refundRes: Awaited<ReturnType<XrplRuntime['escrowService']['refundFee']>>
@@ -1432,7 +1432,7 @@ export class RentalPlatformService {
         throw new HttpError(
           409,
           'FEE_REFUND_FAILED',
-          error instanceof Error ? error.message : 'Rimborso fee fallito.',
+          error instanceof Error ? error.message : 'Fee refund failed.',
         )
       }
 
@@ -1449,7 +1449,7 @@ export class RentalPlatformService {
         throw new HttpError(
           409,
           'FEE_REFUND_REJECTED',
-          `Rimborso fee non validato: ${refundRes.result ?? refundRes.state}.`,
+          `Fee refund not validated: ${refundRes.result ?? refundRes.state}.`,
         )
       }
 
@@ -1461,7 +1461,7 @@ export class RentalPlatformService {
       })
     }
 
-    // 4. Rilascia il vault solo dopo la riconciliazione finale senza operazioni pendenti.
+    // 4. Release the vault only after final reconciliation confirms no pending operations.
     const finalRec = await this.runtime.escrowService.reconcileOrder(orderId, true)
     const finalStatus: OrderLifecycleStatus =
       feeRefundDue === true ? 'revoked_refunded' : 'revoked_unpaid'
@@ -1625,9 +1625,9 @@ export class RentalPlatformService {
     const effectiveStatus = this.effectiveLifecycleStatus(order)
 
     let escrowState: SettlementUiView['escrowState'] = order.createHash ? 'pending' : 'not_created'
-    let escrowLabel = order.createHash ? 'In verifica' : 'Deposito non ancora inviato'
+    let escrowLabel = order.createHash ? 'Verifying' : 'Deposit not yet submitted'
     let payoutPhase: SettlementUiView['payoutPhase'] = 'not_ready'
-    let payoutLabel = 'Non pronto'
+    let payoutLabel = 'Not ready'
     let beneficiary: string | null = order.payoutBeneficiary
     let collectedSigners: readonly string[] = []
     let allowedSigners: readonly string[] = []
@@ -1636,15 +1636,15 @@ export class RentalPlatformService {
 
     if (order.payoutLedgerHash && order.payoutTxHash) {
       payoutPhase = 'validated'
-      payoutLabel = 'Liquidazione validata'
+      payoutLabel = 'Settlement validated'
     } else if (order.pendingStep === 'vault_payout_ledger') {
       payoutPhase = 'awaiting_ledger'
-      payoutLabel = 'In attesa del ledger'
+      payoutLabel = 'Awaiting ledger'
     } else {
       const draft = this.runtime.attemptStore.getMultisigDraft(order.orderId)
       if (draft && draft.submittedHash === null) {
         payoutPhase = 'awaiting_signatures'
-        payoutLabel = 'In attesa di firma (2 su 3)'
+        payoutLabel = 'Awaiting signature (2 of 3)'
         resolutionMode = draft.resolutionMode
         beneficiary = draft.beneficiary
         collectedSigners = [draft.sig1Signer, draft.sig2Signer].filter(
@@ -1673,90 +1673,90 @@ export class RentalPlatformService {
           snap,
         )
         escrowState = esc.state
-        if (esc.state === 'locked') escrowLabel = 'Deposito bloccato nell’escrow'
-        else if (esc.state === 'releasable') escrowLabel = 'Sbloccabile (EscrowFinish pronto)'
-        else if (esc.state === 'credited_to_vault') escrowLabel = 'Accreditato al vault'
-        else if (esc.state === 'pending') escrowLabel = 'In attesa del ledger'
-        else if (esc.state === 'missing') escrowLabel = 'Assente'
-        else if (esc.state === 'mismatch') escrowLabel = 'Incoerente'
+        if (esc.state === 'locked') escrowLabel = 'Deposit locked in escrow'
+        else if (esc.state === 'releasable') escrowLabel = 'Releasable (EscrowFinish ready)'
+        else if (esc.state === 'credited_to_vault') escrowLabel = 'Credited to vault'
+        else if (esc.state === 'pending') escrowLabel = 'Awaiting ledger'
+        else if (esc.state === 'missing') escrowLabel = 'Missing'
+        else if (esc.state === 'mismatch') escrowLabel = 'Mismatch'
       } catch {
         escrowState = 'unavailable'
-        escrowLabel = 'Ledger indisponibile'
+        escrowLabel = 'Ledger unavailable'
       }
     }
 
     if (order.pendingStep === 'escrow_finish') {
-      escrowLabel = 'Sblocco inviato (in attesa del ledger)'
+      escrowLabel = 'Release submitted (awaiting ledger)'
     }
 
     const statusDescriptions: Record<OrderLifecycleStatus, { label: string; nextSigner: string | null; nextAction: string }> = {
       awaiting_authority: {
-        label: 'In attesa dell’ente',
+        label: 'Awaiting authority',
         nextSigner: resource.authorityName,
-        nextAction: `Valutazione manuale di ${resource.authorityName} (approva/rifiuta)`,
+        nextAction: `Manual review by ${resource.authorityName} (approve/reject)`,
       },
       rejected: {
-        label: 'Rifiutato dall’ente',
+        label: 'Rejected by authority',
         nextSigner: 'Alice',
-        nextAction: 'Alice può proporre un nuovo prezzo su una nuova revisione',
+        nextAction: 'Alice can propose a new price on a new revision',
       },
       approved_offer_pending: {
-        label: 'In verifica (emissione pass)',
+        label: 'Verifying (pass issuance)',
         nextSigner: null,
-        nextAction: 'Riconciliare la transazione di mint/offerta sul ledger',
+        nextAction: 'Reconcile mint/offer transaction on the ledger',
       },
       approved_offer_ready: {
-        label: 'Pass emesso · offerta pronta per Bob',
+        label: 'Pass issued · offer ready for Bob',
         nextSigner: 'Bob',
-        nextAction: 'Bob accetta l’offerta del pass e paga la commissione all’ente',
+        nextAction: 'Bob accepts the pass offer and pays the authority fee',
       },
       pass_delivered_unfunded: {
-        label: 'Pass consegnato · deposito mancante',
+        label: 'Pass delivered · deposit missing',
         nextSigner: 'Bob',
-        nextAction: 'Bob deposita il netto nell’escrow temporale oppure l’ente avvia il recupero dopo il termine',
+        nextAction: 'Bob deposits net amount into the timed escrow or authority starts recovery after deadline',
       },
       deposit_verifying: {
-        label: 'In verifica (deposito escrow)',
+        label: 'Verifying (escrow deposit)',
         nextSigner: null,
-        nextAction: 'Attendere la validazione di EscrowCreate sul ledger',
+        nextAction: 'Wait for EscrowCreate validation on the ledger',
       },
       confirmed: {
-        label: 'Prenotazione confermata',
+        label: 'Booking confirmed',
         nextSigner: null,
-        nextAction: 'Attendere l’inizio dell’intervallo concordato',
+        nextAction: 'Wait for the agreed start time',
       },
       active: {
-        label: 'Affitto attivo',
+        label: 'Active rental',
         nextSigner: null,
-        nextAction: 'Bob utilizza la risorsa in esclusiva fino alla scadenza',
+        nextAction: 'Bob has exclusive use of the resource until expiration',
       },
       expired: {
-        label: 'Affitto terminato',
-        nextSigner: escrowState === 'credited_to_vault' ? '2 firmatari su 3 (Alice, Bob o Ente)' : 'Operatore / 2 firmatari',
+        label: 'Rental ended',
+        nextSigner: escrowState === 'credited_to_vault' ? '2 of 3 signers (Alice, Bob, or Authority)' : 'Operator / 2 signers',
         nextAction:
           escrowState === 'credited_to_vault'
-            ? 'Raccogliere 2 firme su 3 per liquidare il netto dal vault'
-            : 'Inviare EscrowFinish e raccogliere 2 firme su 3 sul vault',
+            ? 'Collect 2 of 3 signatures to settle net payout from the vault'
+            : 'Submit EscrowFinish and collect 2 of 3 signatures on the vault',
       },
       recovery_verifying: {
-        label: 'In verifica (recupero checkout)',
+        label: 'Verifying (checkout recovery)',
         nextSigner: resource.authorityName,
-        nextAction: 'Riconciliare burn pass e rimborso fee sul ledger',
+        nextAction: 'Reconcile pass burn and fee refund on the ledger',
       },
       revoked_refunded: {
-        label: 'Pass revocato e fee rimborsata',
+        label: 'Pass revoked and fee refunded',
         nextSigner: null,
-        nextAction: 'Ordine chiuso e vault liberato',
+        nextAction: 'Order closed and vault released',
       },
       revoked_unpaid: {
-        label: 'Offerta scaduta · pass revocato senza addebiti',
+        label: 'Offer expired · pass revoked with no charges',
         nextSigner: null,
-        nextAction: 'Ordine chiuso e vault liberato',
+        nextAction: 'Order closed and vault released',
       },
       settled: {
-        label: 'Liquidato e chiuso',
+        label: 'Settled and closed',
         nextSigner: null,
-        nextAction: 'Netto liquidato e vault disponibile per nuovi ordini',
+        nextAction: 'Net payout settled and vault available for new orders',
       },
     }
 
@@ -1787,7 +1787,7 @@ export class RentalPlatformService {
       proposalHash: order.proposalHash,
       agreementHash: order.agreementHash,
       status: effectiveStatus,
-      statusLabel: order.pendingStep && !desc.label.includes('In verifica') ? `${desc.label} (In verifica)` : desc.label,
+      statusLabel: order.pendingStep && !desc.label.includes('Verifying') ? `${desc.label} (Verifying)` : desc.label,
       rejectionReason: order.rejectionReason,
       pendingStep: order.pendingStep,
       nextSigner: desc.nextSigner,
@@ -1842,7 +1842,7 @@ export class RentalPlatformService {
     }
   }
 
-  // --- Controllo di accesso condiviso (CAD e Cartellone) ---
+  // --- Shared access control (CAD and Billboard) ---
 
   private async verifyConfirmedOrderOnSnapshot(
     order: OrderRecord,
@@ -1900,7 +1900,7 @@ export class RentalPlatformService {
     const nowUtc = this.nowUtc()
     const nowTorino = formatTorinoDateTime(nowUtc)
     const isCad = resource.serviceType === 'cad_portal'
-    const resourceShortLabel = isCad ? 'questo posto CAD' : `l’impianto ${resource.resourceId}`
+    const resourceShortLabel = isCad ? 'this CAD seat' : `installation ${resource.resourceId}`
 
     const baseInfo = {
       resourceId: resource.resourceId,
@@ -1913,7 +1913,7 @@ export class RentalPlatformService {
       serverNowTorino: nowTorino,
     } as const
 
-    // Verifica composta su uno snapshot validato comune (ripetuta una volta se il nodo cambia durante la lettura).
+    // Composite verification on a shared validated snapshot (retried once if the node advances during reading).
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const snapshot = await this.runtime.escrowLedger.snapshot()
@@ -1939,8 +1939,8 @@ export class RentalPlatformService {
             httpStatus: 401,
             code: 'SESSION_REQUIRED',
             titleState,
-            headline: 'Sessione richiesta',
-            reason: 'Collega il wallet con firma monouso per verificare il diritto d’accesso.',
+            headline: 'Session required',
+            reason: 'Connect your wallet with a one-time signature to verify access rights.',
             activeOrderId: null,
             activeFromUtc: null,
             activeUntilUtc: null,
@@ -1987,8 +1987,8 @@ export class RentalPlatformService {
               httpStatus: 200,
               code: 'BOB_ACTIVE',
               titleState,
-              headline: `Pass attivo fino al ${untilTorino}.`,
-              reason: `Pass attivo fino al ${untilTorino}.`,
+              headline: `Pass active until ${untilTorino}.`,
+              reason: `Pass active until ${untilTorino}.`,
               activeOrderId: verifiedActiveOrder.orderId,
               activeFromUtc: verifiedActiveOrder.startsAt,
               activeUntilUtc: verifiedActiveOrder.endsAt,
@@ -2007,8 +2007,8 @@ export class RentalPlatformService {
               httpStatus: 403,
               code: 'ALICE_SUSPENDED',
               titleState,
-              headline: `Hai affittato la tua licenza a Bob fino al ${untilTorino}. Fino a quel momento le funzionalità sono sospese.`,
-              reason: `Hai affittato la tua licenza a Bob fino al ${untilTorino}. Fino a quel momento le funzionalità sono sospese.`,
+              headline: `You have rented your license to Bob until ${untilTorino}. Features are suspended until then.`,
+              reason: `You have rented your license to Bob until ${untilTorino}. Features are suspended until then.`,
               activeOrderId: verifiedActiveOrder.orderId,
               activeFromUtc: verifiedActiveOrder.startsAt,
               activeUntilUtc: verifiedActiveOrder.endsAt,
@@ -2026,8 +2026,8 @@ export class RentalPlatformService {
             httpStatus: 403,
             code: 'NO_RIGHT',
             titleState,
-            headline: 'Accesso non disponibile',
-            reason: `Accesso non disponibile. Questo wallet non possiede un diritto valido per ${resourceShortLabel}.`,
+            headline: 'Access unavailable',
+            reason: `Access unavailable. This wallet does not hold a valid right for ${resourceShortLabel}.`,
             activeOrderId: verifiedActiveOrder.orderId,
             activeFromUtc: verifiedActiveOrder.startsAt,
             activeUntilUtc: verifiedActiveOrder.endsAt,
@@ -2040,7 +2040,7 @@ export class RentalPlatformService {
           }
         }
 
-        // Nessun affitto attivo verificato adesso. Verifica prenotazioni future o stati di Bob / Alice.
+        // No active verified rental right now. Check upcoming bookings or Bob / Alice states.
         const upcomingConfirmed = orders.find(
           (o) => (o.status === 'confirmed' || o.status === 'active') && nowUtc < o.startsAt,
         )
@@ -2060,15 +2060,15 @@ export class RentalPlatformService {
           const nextChange = verifiedUpcoming?.startsAt ?? resource.validTo
           if (titleState === 'active') {
             const untilText = verifiedUpcoming
-              ? `Licenza attiva. Prossima prenotazione confermata dalle ${formatTorinoDateTime(verifiedUpcoming.startsAt)}.`
-              : `Licenza attiva fino al ${formatTorinoDateTime(resource.validTo)}.`
+              ? `Active license. Next confirmed booking starting ${formatTorinoDateTime(verifiedUpcoming.startsAt)}.`
+              : `Active license until ${formatTorinoDateTime(resource.validTo)}.`
             return {
               ...baseInfo,
               canAccess: true,
               httpStatus: 200,
               code: 'ALICE_ACTIVE',
               titleState,
-              headline: 'Licenza attiva',
+              headline: 'Active license',
               reason: untilText,
               activeOrderId: null,
               activeFromUtc: resource.validFrom,
@@ -2088,8 +2088,8 @@ export class RentalPlatformService {
               httpStatus: 403,
               code: 'LICENSE_EXPIRED',
               titleState,
-              headline: 'Licenza scaduta',
-              reason: 'Licenza scaduta. Il titolo principale è terminato.',
+              headline: 'License expired',
+              reason: 'License expired. The main title has ended.',
               activeOrderId: null,
               activeFromUtc: null,
               activeUntilUtc: null,
@@ -2107,8 +2107,8 @@ export class RentalPlatformService {
             httpStatus: 403,
             code: 'NO_RIGHT',
             titleState,
-            headline: 'Titolo principale non valido',
-            reason: `Titolo principale non verificato sul ledger per ${resourceShortLabel}.`,
+            headline: 'Invalid base title',
+            reason: `Base title not verified on the ledger for ${resourceShortLabel}.`,
             activeOrderId: null,
             activeFromUtc: null,
             activeUntilUtc: null,
@@ -2121,7 +2121,7 @@ export class RentalPlatformService {
           }
         }
 
-        // Controlla lo stato dell'ordine più rilevante per Bob (escludendo ordini con solo SQLite manomesso).
+        // Check status of the most relevant order for Bob (excluding orders tampered with only in SQLite).
         const bobOrdersDesc = this.store
           .listOrders(resource.resourceId)
           .filter((o) => o.bob === session.address)
@@ -2135,8 +2135,8 @@ export class RentalPlatformService {
             httpStatus: 409,
             code: 'CONFIRMED_BEFORE_START',
             titleState,
-            headline: `Prenotazione confermata. Potrai usare il ${isCad ? 'CAD' : 'cartellone'} dal ${startTorino}.`,
-            reason: `Prenotazione confermata. Potrai usare il ${isCad ? 'CAD' : 'cartellone'} dal ${startTorino}.`,
+            headline: `Booking confirmed. You will be able to use the ${isCad ? 'CAD' : 'billboard'} starting ${startTorino}.`,
+            reason: `Booking confirmed. You will be able to use the ${isCad ? 'CAD' : 'billboard'} starting ${startTorino}.`,
             activeOrderId: verifiedUpcoming.orderId,
             activeFromUtc: verifiedUpcoming.startsAt,
             activeUntilUtc: verifiedUpcoming.endsAt,
@@ -2170,8 +2170,8 @@ export class RentalPlatformService {
               httpStatus: 409,
               code: 'PASS_DELIVERED_NO_DEPOSIT',
               titleState,
-              headline: 'Pass ricevuto. Completa il deposito per confermare l’affitto.',
-              reason: 'Pass ricevuto. Completa il deposito per confermare l’affitto.',
+              headline: 'Pass received. Complete the deposit to confirm the rental.',
+              reason: 'Pass received. Complete the deposit to confirm the rental.',
               activeOrderId: latestBob.orderId,
               activeFromUtc: latestBob.startsAt,
               activeUntilUtc: latestBob.endsAt,
@@ -2193,8 +2193,8 @@ export class RentalPlatformService {
         ) {
           const msg =
             latestBob.status === 'approved_offer_ready'
-              ? 'Pass approvato dall’ente. Accetta l’offerta e completa il deposito.'
-              : 'In attesa dell’ente.'
+              ? 'Pass approved by authority. Accept the offer and complete the deposit.'
+              : 'Awaiting authority.'
           return {
             ...baseInfo,
             canAccess: false,
@@ -2239,8 +2239,8 @@ export class RentalPlatformService {
               httpStatus: 403,
               code: 'RENTAL_EXPIRED',
               titleState,
-              headline: 'Pass scaduto. Il periodo di utilizzo è terminato.',
-              reason: 'Pass scaduto. Il periodo di utilizzo è terminato.',
+              headline: 'Pass expired. The usage period has ended.',
+              reason: 'Pass expired. The usage period has ended.',
               activeOrderId: latestBob.orderId,
               activeFromUtc: latestBob.startsAt,
               activeUntilUtc: latestBob.endsAt,
@@ -2260,8 +2260,8 @@ export class RentalPlatformService {
           httpStatus: 403,
           code: 'NO_RIGHT',
           titleState,
-          headline: 'Accesso non disponibile',
-          reason: `Accesso non disponibile. Questo wallet non possiede un diritto valido per ${resourceShortLabel}.`,
+          headline: 'Access unavailable',
+          reason: `Access unavailable. This wallet does not hold a valid right for ${resourceShortLabel}.`,
           activeOrderId: null,
           activeFromUtc: null,
           activeUntilUtc: null,
@@ -2282,8 +2282,8 @@ export class RentalPlatformService {
           httpStatus: 503,
           code: 'LEDGER_UNAVAILABLE',
           titleState: 'unavailable',
-          headline: 'Verifica ledger non disponibile',
-          reason: 'Nodo XRPL Testnet momentaneamente non raggiungibile. Riprova tra poco.',
+          headline: 'Ledger verification unavailable',
+          reason: 'XRPL Testnet node temporarily unreachable. Please try again shortly.',
           activeOrderId: null,
           activeFromUtc: null,
           activeUntilUtc: null,
@@ -2297,13 +2297,13 @@ export class RentalPlatformService {
       }
     }
 
-    throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'Verifica ledger non disponibile.')
+    throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'Ledger verification unavailable.')
   }
 
   async openCadDemoProject(sessionRef: string | null, rawResourceId: string) {
     const access = await this.evaluateResourceAccess(sessionRef, rawResourceId)
     if (access.serviceType !== 'cad_portal') {
-      throw new HttpError(400, 'NOT_CAD_RESOURCE', 'La risorsa selezionata non è un posto CAD.')
+      throw new HttpError(400, 'NOT_CAD_RESOURCE', 'The selected resource is not a CAD seat.')
     }
     if (!access.canAccess) {
       throw new HttpError(access.httpStatus, access.code, access.reason)
@@ -2312,7 +2312,7 @@ export class RentalPlatformService {
       access,
       project: {
         projectId: 'cad-assieme-riduttore-2026',
-        title: 'Assieme Riduttore Epicicloidale · Rev. 4',
+        title: 'Epicyclic Gearbox Assembly · Rev. 4',
         seatName: access.resourceName,
         openedByRole: access.role,
         openedByAddress: access.sessionAddress,
@@ -2324,7 +2324,7 @@ export class RentalPlatformService {
     }
   }
 
-  // --- Cartellone pubblicitario ---
+  // --- Advertising billboard ---
 
   async uploadBillboardImage(
     sessionRef: string | null,
@@ -2333,7 +2333,7 @@ export class RentalPlatformService {
   ): Promise<BillboardPublicationRecord> {
     const access = await this.evaluateResourceAccess(sessionRef, rawResourceId)
     if (access.serviceType !== 'digital_billboard') {
-      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'La risorsa selezionata non è un cartellone pubblicitario.')
+      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'The selected resource is not an advertising billboard.')
     }
     if (!access.canAccess) {
       throw new HttpError(access.httpStatus, access.code, access.reason)
@@ -2346,7 +2346,7 @@ export class RentalPlatformService {
       throw new HttpError(
         400,
         'INVALID_IMAGE',
-        error instanceof Error ? error.message : 'File immagine non valido.',
+        error instanceof Error ? error.message : 'Invalid image file.',
       )
     }
 
@@ -2374,7 +2374,7 @@ export class RentalPlatformService {
   async getBillboardCurrent(rawResourceId: string): Promise<BillboardCurrentView> {
     const resource = this.requireResource(rawResourceId)
     if (resource.serviceType !== 'digital_billboard') {
-      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'La risorsa selezionata non è un cartellone pubblicitario.')
+      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'The selected resource is not an advertising billboard.')
     }
     const nowUtc = this.nowUtc()
     const pub = this.store.getBillboardPublication(resource.resourceId)
@@ -2394,7 +2394,7 @@ export class RentalPlatformService {
       }
     }
 
-    // Verifica sul server che l'eventuale ordine associato sia ancora attivo nell'intervallo [startsAt, endsAt).
+    // Verify on the server that the associated order (if any) is still active in [startsAt, endsAt).
     if (pub.orderId !== 'owner-title') {
       const order = this.store.getOrder(pub.orderId)
       if (!order || nowUtc < order.startsAt || nowUtc >= order.endsAt) {
@@ -2436,7 +2436,7 @@ export class RentalPlatformService {
           }
         }
       } catch {
-        // In caso di perdita di rete non si prolunga oltre pub.expiresAt; se già scaduto è già stato respinto sopra.
+        // On network loss, do not extend beyond pub.expiresAt; if already expired, it was already rejected above.
       }
     }
 
@@ -2468,7 +2468,7 @@ export class RentalPlatformService {
     }
   }
 
-  // --- Simulazione delle 4 risposte iniziali & Primo Scambio ---
+  // --- Simulation of the 4 initial responses & First Exchange ---
 
   getSampleCadExchange(): SampleOrderExchange {
     const orders = this.store.listOrders('cad')
@@ -2507,7 +2507,7 @@ export class RentalPlatformService {
 
   advanceSimulatedTime(seconds: number): { readonly nowUtc: string; readonly nowTorino: string } {
     if (!this.runtime.simulatedNode) {
-      throw new HttpError(400, 'NOT_SIMULATED_MODE', 'L’avanzamento temporale è disponibile solo in modalità simulata.')
+      throw new HttpError(400, 'NOT_SIMULATED_MODE', 'Time advancement is available only in simulated mode.')
     }
     this.runtime.simulatedNode.advanceSeconds(seconds)
     return {
@@ -2526,7 +2526,7 @@ export class RentalPlatformService {
       throw new HttpError(
         400,
         'NOT_SIMULATED_MODE',
-        'I preset simulati sono disponibili solo in modalità simulata locale.',
+        'Simulated presets are available only in local simulated mode.',
       )
     }
 
@@ -2543,7 +2543,7 @@ export class RentalPlatformService {
       (isShortTitle ? endsAtSec : nowSec + 365 * 24 * 3600) * 1000,
     )
 
-    // Assicura un titolo principale coerente per il preset selezionato.
+    // Ensure a base title consistent with the selected preset.
     const cadTitleNftId = await this.ensureTitleOnLedger({
       resourceId: 'cad',
       issuerSigner: this.runtime.signers.cadAuthority,
@@ -2569,7 +2569,7 @@ export class RentalPlatformService {
       }
     }
 
-    // Crea un annuncio firmato da Alice e un ordine accettato da Bob su CAD.
+    // Create a listing signed by Alice and an order accepted by Bob on CAD.
     const fundBy = formatUtcSecond((nowSec + 30) * 1000)
     const startsAt = formatUtcSecond((nowSec + 60) * 1000)
     const endsAt = formatUtcSecond(endsAtSec * 1000)
@@ -2629,7 +2629,7 @@ export class RentalPlatformService {
       if (preset === 'active_rental') {
         this.runtime.simulatedNode.advanceSeconds(70)
       } else {
-        // expired_rental oppure expired_rental_and_license
+        // expired_rental or expired_rental_and_license
         this.runtime.simulatedNode.advanceSeconds(135)
       }
 

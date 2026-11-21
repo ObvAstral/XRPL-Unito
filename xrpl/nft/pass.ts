@@ -16,7 +16,7 @@ const rippleEpoch = 946_684_800
 
 export function record(value: unknown): Fields {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Oggetto XRPL o JSON non valido.')
+    throw new Error('Invalid XRPL or JSON object.')
   }
   return value as Fields
 }
@@ -26,24 +26,24 @@ export function isHash(value: unknown): value is string {
 }
 
 export function readHash(value: unknown): string {
-  if (!isHash(value)) throw new Error('Identificativo XRPL non valido.')
+  if (!isHash(value)) throw new Error('Invalid XRPL identifier.')
   return value.toUpperCase()
 }
 
 export function readUint32(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 0xffffffff) {
-    throw new Error('Intero XRPL UInt32 non valido.')
+    throw new Error('Invalid XRPL UInt32 integer.')
   }
   return value
 }
 
 export function rippleTime(utc: string): number {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(utc)) {
-    throw new Error('Scadenza richiesta in formato UTC ISO 8601 al secondo.')
+    throw new Error('Timestamp required in UTC ISO 8601 format at second precision.')
   }
   const date = new Date(utc)
   if (!Number.isFinite(date.valueOf()) || date.toISOString() !== utc.replace('Z', '.000Z')) {
-    throw new Error('Scadenza UTC non valida.')
+    throw new Error('Invalid UTC timestamp.')
   }
   return readUint32(date.valueOf() / 1000 - rippleEpoch)
 }
@@ -54,18 +54,18 @@ export async function readValidatedLedger(rpc: LedgerRequest, ledgerId?: string 
   const ledger = record(data.ledger)
   const actualHash = readHash(data.ledger_hash ?? ledger.ledger_hash)
   if (data.validated !== true || (hash && actualHash !== readHash(hash))) {
-    throw new Error('Snapshot XRPL non validato o incoerente.')
+    throw new Error('Unvalidated or inconsistent XRPL snapshot.')
   }
   const rawIndex = data.ledger_index ?? ledger.ledger_index
   const index = readUint32(typeof rawIndex === 'string' && /^\d+$/.test(rawIndex) ? Number(rawIndex) : rawIndex)
-  if (typeof ledgerId === 'number' && index !== ledgerId) throw new Error('Indice del ledger incoerente.')
+  if (typeof ledgerId === 'number' && index !== ledgerId) throw new Error('Inconsistent ledger index.')
   return { hash: actualHash, index, closeTime: readUint32(ledger.close_time) }
 }
 
 export async function recentSnapshot(rpc: LedgerRequest): Promise<Snapshot> {
   const snapshot = await readValidatedLedger(rpc)
   if (Date.now() / 1000 - (snapshot.closeTime + rippleEpoch) > 30) {
-    throw new Error('Il nodo non dispone di un ledger validato recente.')
+    throw new Error('Node does not have a recent validated ledger.')
   }
   return snapshot
 }
@@ -74,16 +74,16 @@ export async function recentSnapshot(rpc: LedgerRequest): Promise<Snapshot> {
 export function checkOfferWindow(expiresAt: string, snapshot: Snapshot): number {
   const expiry = rippleTime(expiresAt)
   if (expiry <= snapshot.closeTime || Date.now() / 1000 >= expiry + rippleEpoch) {
-    throw new Error('L’offerta è scaduta.')
+    throw new Error('The offer has expired.')
   }
   return expiry
 }
 
 function assertSnapshot(data: Fields, hash: string) {
   if (readHash(data.ledger_hash) !== hash) {
-    throw new Error('La risposta XRPL usa uno snapshot diverso.')
+    throw new Error('XRPL response uses a different snapshot.')
   }
-  if (data.validated === false) throw new Error('Il nodo non ha ancora validato lo snapshot richiesto.')
+  if (data.validated === false) throw new Error('Node has not validated the requested snapshot yet.')
 }
 
 export async function readAtSnapshot(rpc: LedgerRequest, command: string, fields: Fields, hash: string) {
@@ -107,7 +107,7 @@ export async function findOwnedNft(rpc: LedgerRequest, account: string, nftId: s
       ...(marker === undefined ? {} : { marker }),
     }, hash)
     if (page.account !== account || !Array.isArray(page.account_nfts)) {
-      throw new Error('Pagina NFT non valida.')
+      throw new Error('Invalid NFT page.')
     }
     for (const value of page.account_nfts) {
       const nft = record(value)
@@ -116,7 +116,7 @@ export async function findOwnedNft(rpc: LedgerRequest, account: string, nftId: s
     marker = page.marker
     if (marker !== undefined) {
       const key = JSON.stringify(marker)
-      if (marker === null || markers.has(key)) throw new Error('Paginazione XRPL incoerente.')
+      if (marker === null || markers.has(key)) throw new Error('Inconsistent XRPL pagination.')
       markers.add(key)
     }
   } while (marker !== undefined)

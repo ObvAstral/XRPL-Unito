@@ -12,7 +12,7 @@ export type LoginChallenge = {
 
 function domainName(domain: string): string {
   if (!/^[a-z0-9.-]+(?::[0-9]+)?$/i.test(domain) || new URL('https://' + domain).host !== domain) {
-    throw new Error('È richiesto il dominio canonico dell’applicazione.')
+    throw new Error('Canonical application domain is required.')
   }
   return domain
 }
@@ -21,7 +21,7 @@ export function signLogin(challenge: LoginChallenge, expectedDomain: string, sig
   if (challenge.domain !== domainName(expectedDomain) || challenge.network !== 'testnet'
     || !/^[0-9a-f]{64}$/.test(challenge.id) || !challenge.sessionRef
     || !Number.isSafeInteger(challenge.expiresAt) || challenge.expiresAt <= now) {
-    throw new Error('Richiesta di login non valida per questo dominio.')
+    throw new Error('Invalid login challenge for this domain.')
   }
   const { id, domain, network, expiresAt, sessionRef } = challenge
   return signer.signMessage('login', { id, domain, network, expiresAt, sessionRef })
@@ -45,7 +45,7 @@ export class WalletLogin {
   }
 
   issue(sessionRef: string): LoginChallenge {
-    if (!sessionRef) throw new Error('Sessione in attesa richiesta.')
+    if (!sessionRef) throw new Error('Pending session reference required.')
     const now = this.clock()
     const challenge: LoginChallenge = {
       id: randomBytes(32).toString('hex'), domain: this.domain, network: 'testnet',
@@ -61,14 +61,14 @@ export class WalletLogin {
     const challenge = this.db.prepare(
       'SELECT expiresAt FROM wallet_challenges WHERE id = ? AND domain = ? AND sessionRef = ? AND expiresAt > ?',
     ).get(id, this.domain, sessionRef, this.clock())
-    if (!challenge) throw new Error('Richiesta di login scaduta, consumata o estranea alla sessione.')
+    if (!challenge) throw new Error('Login challenge expired, consumed, or foreign to this session.')
     const address = verifyWalletSignature('login', {
       id, domain: this.domain, network: 'testnet', expiresAt: Number(challenge.expiresAt), sessionRef,
     }, proof)
     const deleted = this.db.prepare(
       'DELETE FROM wallet_challenges WHERE id = ? AND domain = ? AND sessionRef = ? AND expiresAt > ?',
     ).run(id, this.domain, sessionRef, this.clock())
-    if (deleted.changes !== 1) throw new Error('Richiesta di login già consumata o scaduta.')
+    if (deleted.changes !== 1) throw new Error('Login challenge already consumed or expired.')
     return { address }
   }
 

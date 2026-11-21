@@ -14,21 +14,21 @@ import { AttemptJournal } from '../nft/transactions.js'
 import { recentSnapshot } from '../nft/pass.js'
 
 const commands = {
-  'wallet-create': ['ruolo'],
-  'wallet-address': ['ruolo'],
-  'tx-sign': ['transazione.json', 'ruolo'],
-  'tx-sign-partial': ['transazione.json', 'ruolo'],
-  'login-issue': ['dominio', 'sessionRef'],
-  'login-sign': ['dominio', 'challenge.json', 'ruolo'],
-  'login-consume': ['dominio', 'sessionRef', 'risposta.json'],
-  'proposal-sign': ['proposta.json', 'ruolo'],
-  'order-sign': ['proposta-firmata.json', 'ordine.json', 'ruolo'],
-  'rental-verify': ['accordo.json', 'risorsa.json'],
-  'title-issue': ['titolo.json', 'ruolo'],
-  'title-accept': ['titolo.json', 'offerta.json', 'ruolo'],
-  'pass-issue': ['accordo.json', 'risorsa.json', 'ruolo'],
-  'pass-accept': ['accordo.json', 'risorsa.json', 'offerta.json', 'ruolo'],
-  'pass-verify': ['accordo.json', 'risorsa.json', 'nftId', 'ledgerHash'],
+  'wallet-create': ['role'],
+  'wallet-address': ['role'],
+  'tx-sign': ['transaction.json', 'role'],
+  'tx-sign-partial': ['transaction.json', 'role'],
+  'login-issue': ['domain', 'sessionRef'],
+  'login-sign': ['domain', 'challenge.json', 'role'],
+  'login-consume': ['domain', 'sessionRef', 'response.json'],
+  'proposal-sign': ['proposal.json', 'role'],
+  'order-sign': ['signed-proposal.json', 'order.json', 'role'],
+  'rental-verify': ['agreement.json', 'resource.json'],
+  'title-issue': ['title.json', 'role'],
+  'title-accept': ['title.json', 'offer.json', 'role'],
+  'pass-issue': ['agreement.json', 'resource.json', 'role'],
+  'pass-accept': ['agreement.json', 'resource.json', 'offer.json', 'role'],
+  'pass-verify': ['agreement.json', 'resource.json', 'nftId', 'ledgerHash'],
   'mint-offer-mode': [],
 } as const
 
@@ -40,12 +40,12 @@ function privateDirectory(): string {
   const directory = process.env.XRPL_RENTAL_STATE_DIR ?? join(homedir(), '.local', 'state', 'xrpl-unito-rental')
   mkdirSync(directory, { recursive: true, mode: 0o700 })
   const state = lstatSync(directory)
-  if (!state.isDirectory() || (state.mode & 0o077) !== 0) throw new Error('Directory di stato privata (0700) richiesta.')
+  if (!state.isDirectory() || (state.mode & 0o077) !== 0) throw new Error('Private state directory (0700) required.')
   return directory
 }
 
 function seed(role: string) {
-  if (!['alice', 'bob', 'cad', 'comune'].includes(role)) throw new Error('Ruoli ammessi: alice, bob, cad, comune.')
+  if (!['alice', 'bob', 'cad', 'comune'].includes(role)) throw new Error('Allowed roles: alice, bob, cad, comune.')
   return join(privateDirectory(), role + '.seed')
 }
 
@@ -53,14 +53,15 @@ async function confirm(request: object): Promise<boolean> {
   console.error(JSON.stringify(request, null, 2))
   const terminal = createInterface({ input: process.stdin, output: process.stderr })
   try {
-    return (await terminal.question('Digita SI per firmare: ')).trim() === 'SI'
+    const answer = (await terminal.question('Type YES to sign: ')).trim().toUpperCase()
+    return answer === 'YES' || answer === 'SI'
   } finally {
     terminal.close()
   }
 }
 
 async function approve(request: object) {
-  if (!await confirm(request)) throw new Error('Firma annullata.')
+  if (!await confirm(request)) throw new Error('Signature canceled.')
 }
 
 async function main(command: keyof typeof commands, args: string[]) {
@@ -134,7 +135,7 @@ async function main(command: keyof typeof commands, args: string[]) {
 
 const [command, ...args] = process.argv.slice(2)
 if (!command || !Object.hasOwn(commands, command) || args.length !== commands[command as keyof typeof commands].length) {
-  console.error('Uso: node xrpl/dist/agreement/rental-cli.js <comando>\n' + Object.entries(commands)
+  console.error('Usage: node xrpl/dist/agreement/rental-cli.js <command>\n' + Object.entries(commands)
     .map(([name, fields]) => [name, ...fields].join(' ')).join('\n'))
   process.exitCode = 1
 } else {
@@ -144,7 +145,7 @@ if (!command || !Object.hasOwn(commands, command) || args.length !== commands[co
     if ('status' in result && (result.status === 'pending' || result.status === 'unavailable')) process.exitCode = 2
     else if ('status' in result && (result.status === 'rejected' || result.status === 'absent')) process.exitCode = 1
   } catch (error) {
-    console.error(error instanceof Error ? error.message : 'Operazione fallita.')
+    console.error(error instanceof Error ? error.message : 'Operation failed.')
     process.exitCode = 1
   }
 }

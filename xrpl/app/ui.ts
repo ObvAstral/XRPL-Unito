@@ -4,11 +4,11 @@ export { renderCadPortalHtml } from './cad-ui.js'
 export function renderBillboardPlayerHtml(resourceId: string): string {
   const safeId = resourceId.replace(/[^a-zA-Z0-9_-]/g, '')
   return `<!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Schermo ${safeId}</title>
+  <title>Screen ${safeId}</title>
   <style>
     html, body { margin: 0; width: 100%; height: 100%; background: #ffffff; overflow: hidden; }
     img { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }

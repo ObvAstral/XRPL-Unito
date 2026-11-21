@@ -1,11 +1,11 @@
 export type VaultScenario = 'cad' | 'billboard'
 
 /**
- * Modalita' di liquidazione del saldo maturato nel vault 2 su 3:
- * - ordinary: pagamento ad Alice con due firme tra Alice, Bob ed ente competente
- * - arbitration_alice: contestazione vinta da Alice -> firme Ente + Alice -> beneficiario Alice
- * - arbitration_bob: contestazione vinta da Bob -> firme Ente + Bob -> beneficiario Bob
- * - inadmissible_refund: ordine risultato inammissibile con netto gia' bloccato -> 2 firme tra {Alice, Bob, Ente} -> beneficiario Bob
+ * Settlement mode for matured balance in the 2-of-3 vault:
+ * - ordinary: payment to Alice with two signatures among Alice, Bob, and competent authority
+ * - arbitration_alice: dispute won by Alice -> Authority + Alice signatures -> beneficiary Alice
+ * - arbitration_bob: dispute won by Bob -> Authority + Bob signatures -> beneficiary Bob
+ * - inadmissible_refund: order found inadmissible with net already locked -> 2 signatures among {Alice, Bob, Authority} -> beneficiary Bob
  */
 export type VaultResolutionMode =
   | 'ordinary'
@@ -13,7 +13,7 @@ export type VaultResolutionMode =
   | 'arbitration_bob'
   | 'inadmissible_refund'
 
-/** Termini finanziari v2 di un ordine di affitto condivisi tra accordi (A), pagamenti (B) e backend (C). */
+/** v2 financial terms of a rental order shared across agreements (A), payments (B), and backend (C). */
 export interface RentalPaymentOrder {
   readonly orderId: string
   readonly agreementHash: string
@@ -21,29 +21,29 @@ export interface RentalPaymentOrder {
   readonly network: 'testnet'
   readonly alice: string
   readonly bob: string
-  /** Indirizzo classico XRPL dell'ente competente (fornitore CAD o Comune simulato). */
+  /** Classic XRPL address of the competent authority (CAD provider or simulated Municipality). */
   readonly authority: string
-  /** Indirizzo classico XRPL del vault 2-su-3 prefinanziato per lo scenario. */
+  /** Classic XRPL address of the pre-funded 2-of-3 vault for the scenario. */
   readonly vault: string
-  /** Prezzo lordo totale in drops interi (es. "10000000" per 10 XRP). */
+  /** Total gross price in integer drops (e.g. "10000000" for 10 XRP). */
   readonly grossDrops: string
-  /** Percentuale commerciale dell'ente in punti base interi (es. 1000 per 10%). */
+  /** Authority commercial fee percentage in integer basis points (e.g. 1000 for 10%). */
   readonly feeBps: number
-  /** Quota immediata dell'ente alla consegna del pass in drops interi (es. "1000000"). */
+  /** Immediate authority share on pass delivery in integer drops (e.g. "1000000"). */
   readonly feeDrops: string
-  /** Quota netta bloccata nell'escrow per il vault in drops interi (es. "9000000"). */
+  /** Net share locked in escrow for the vault in integer drops (e.g. "9000000"). */
   readonly netDrops: string
-  /** Termine massimo UTC ISO 8601 al secondo entro cui completare consegna pass e deposito escrow. */
+  /** Maximum UTC ISO 8601 second-precision deadline to complete pass delivery and escrow deposit. */
   readonly checkoutDeadline: string
-  /** Inizio periodo d'uso UTC ISO 8601 al secondo. */
+  /** Usage period start in UTC ISO 8601 at second precision. */
   readonly startAt: string
-  /** Fine periodo d'uso UTC ISO 8601 al secondo; coincide con FinishAfter dell'escrow temporale. */
+  /** Usage period end in UTC ISO 8601 at second precision; matches Escrow FinishAfter. */
   readonly endAt: string
-  /** Dati del pass NFT (forniti da A/C) necessari per verificare l'effettivo incasso della fee prima di un rimborso. */
+  /** NFT pass data (supplied by A/C) needed to verify actual fee collection before a refund. */
   readonly passNftId?: string
   readonly offerId?: string
   readonly acceptOfferHash?: string
-  /** Hash di EscrowCreate associato all'ordine non appena inviato o validato. */
+  /** EscrowCreate transaction hash associated with the order once submitted or validated. */
   readonly createHash?: string
 }
 
