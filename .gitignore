@@ -1,7 +1,7 @@
 /job-a-risultato/
 *.md
+!/README.md
 
 /xrpl/node_modules/
 /xrpl/dist/
 /xrpl/.xrpl-local/
-!/xrpl/README.md
