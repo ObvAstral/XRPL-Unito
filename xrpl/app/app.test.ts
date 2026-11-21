@@ -686,6 +686,10 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(after2.data.order.status, 'settled')
     assert.equal(after2.data.order.vaultHeld, false)
     assert.equal(after2.data.order.receipts.payoutDeliveredDrops, '9000000')
+    assert.ok(after2.data.order.verifiedTxs.length >= 4)
+    for (const tx of after2.data.order.verifiedTxs) {
+      assert.equal(tx.explorerUrl, `https://testnet.xrpl.org/transactions/${tx.txHash}`)
+    }
     assert.equal(h.node.getBalanceDrops(aliceAddr) - aliceBalBeforePayout, 9_000_000n)
     const afterPayout = await funds()
     assert.deepEqual(afterPayout.payout, { beneficiary: 'alice', deliveredDrops: '9000000' })

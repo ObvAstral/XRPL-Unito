@@ -41,6 +41,7 @@ import {
   resolveVaultSettlement,
   validateRentalOrder,
 } from './protocol.js'
+import { logValidatedTestnetTx } from '../shared/testnet-node.js'
 
 const SINGLE_SIGNER_LEDGER_WINDOW = 8
 const MULTISIG_LEDGER_WINDOW = 60
@@ -782,6 +783,14 @@ export class EscrowService {
         deliveredDrops,
       },
     )
+    if (completed.state === 'validated') {
+      logValidatedTestnetTx({
+        label: completed.action,
+        txHash: completed.hash,
+        ledgerIndex: completed.ledgerIndex,
+        orderId: completed.orderId,
+      })
+    }
     return toAttemptResult(completed)
   }
 

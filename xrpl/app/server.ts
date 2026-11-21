@@ -16,6 +16,7 @@ import {
   renderMarketplaceHtml,
 } from './ui.js'
 import { createSimulatedRuntime, createTestnetRuntime } from './xrpl-runtime.js'
+import { logValidatedTestnetTx } from '../shared/testnet-node.js'
 
 const COOKIE_NAME = 'affitti_session'
 const MAX_JSON_BODY = 1_048_576
@@ -514,6 +515,22 @@ async function main(): Promise<void> {
   const service = await RentalPlatformService.create({ dataDir, domain, runtime })
   const app = createAppServer(service)
   const baseUrl = await app.listen(port, host)
+  for (const att of runtime.attemptStore.listAllValidated()) {
+    logValidatedTestnetTx({
+      label: att.action,
+      txHash: att.hash,
+      ledgerIndex: att.ledgerIndex,
+      orderId: att.orderId,
+    })
+  }
+  for (const nftAtt of runtime.nftJournal.listValidated()) {
+    logValidatedTestnetTx({
+      label: nftAtt.txType,
+      txHash: nftAtt.txHash,
+      ledgerIndex: nftAtt.ledgerIndex,
+      orderId: nftAtt.orderId,
+    })
+  }
   process.stdout.write(
     `XRPL Rentals v2 Server (${mode}) started on ${baseUrl}\n` +
       `- Marketplace: ${baseUrl}/\n` +

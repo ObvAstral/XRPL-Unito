@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AttemptStore } from './escrow/attempts.js'
 import { connectTestnet } from './escrow/ledger.js'
-import { normalizeTestnetNode } from './shared/testnet-node.js'
+import { logValidatedTestnetTx, normalizeTestnetNode } from './shared/testnet-node.js'
 import {
   createTestnetFaucetFunder,
   runSetupWallets,
@@ -89,6 +89,18 @@ async function main(): Promise<void> {
       faucetFund: createTestnetFaucetFunder(client),
       participantOverrides: args.participantOverrides,
     })
+    for (const setupOrderId of ['setup:cad', 'setup:billboard'] as const) {
+      for (const att of attempts.listByOrder(setupOrderId)) {
+        if (att.state === 'validated') {
+          logValidatedTestnetTx({
+            label: att.action,
+            txHash: att.hash,
+            ledgerIndex: att.ledgerIndex,
+            orderId: att.orderId,
+          })
+        }
+      }
+    }
     process.stderr.write(`Public configuration saved to: ${publicConfigPath}\n`)
     process.stdout.write(`${JSON.stringify(publicOutput, null, 2)}\n`)
   } finally {

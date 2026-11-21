@@ -191,7 +191,63 @@ export function renderCadPortalHtml(): string {
       align-items: center;
       border-left: 4px solid var(--primary);
     }
-    .access-card > .error { grid-column: 1 / -1; }
+    .access-card > .error,
+    .access-card > .tx-verification { grid-column: 1 / -1; }
+    .tx-verification {
+      display: grid;
+      gap: 0.5rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid rgba(0, 191, 255, 0.35);
+      border-inline-start: 3px solid var(--electric);
+      border-radius: var(--radius);
+      background: rgba(0, 191, 255, 0.06);
+    }
+    .tx-verification-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem 0.75rem;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--electric);
+    }
+    .tx-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+    .tx-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      max-width: 100%;
+      padding: 0.3rem 0.6rem;
+      border: 1px solid rgba(0, 191, 255, 0.4);
+      border-radius: var(--radius-sm);
+      background: var(--bg-primary);
+      color: var(--ink);
+      font: 500 0.76rem/1.35 var(--mono);
+      text-decoration: none;
+      overflow-wrap: anywhere;
+    }
+    .tx-link:hover {
+      border-color: var(--circuit);
+      background: var(--primary-dim);
+      color: var(--circuit);
+      text-decoration: none;
+    }
+    .tx-link-badge {
+      padding: 0.1rem 0.36rem;
+      border-radius: var(--radius-sm);
+      background: var(--electric-dim);
+      color: var(--electric);
+      font-size: 0.68rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
     .card p { margin-top: .55rem; color: var(--muted); max-width: 68ch; }
 
     .status-label {
@@ -486,6 +542,7 @@ export function renderCadPortalHtml(): string {
       <div id="project-action" class="actions" hidden>
         <button type="button" id="open-project">Open demo project</button>
       </div>
+      <div id="cad-verified-txs" class="tx-verification" hidden></div>
       <p class="error" id="action-error" role="alert" hidden></p>
     </section>
 
@@ -634,6 +691,35 @@ export function renderCadPortalHtml(): string {
       refreshAccess();
     }
 
+    function escHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      })[char]);
+    }
+
+    function renderCadTxs(verifiedTxs) {
+      const box = el('cad-verified-txs');
+      if (!Array.isArray(verifiedTxs) || !verifiedTxs.length) {
+        box.hidden = true;
+        box.innerHTML = '';
+        return;
+      }
+      box.innerHTML =
+        '<div class="tx-verification-head"><span>Verified XRPL Testnet Transactions</span><span>testnet.xrpl.org</span></div>' +
+        '<div class="tx-links">' +
+        verifiedTxs.map((tx) => {
+          const clean = String(tx.txHash || '').trim().toUpperCase();
+          const short = clean.length > 16 ? clean.slice(0, 8) + '…' + clean.slice(-6) : clean;
+          const ledger = tx.ledgerIndex != null ? ' · #' + tx.ledgerIndex : '';
+          const url = tx.explorerUrl || ('https://testnet.xrpl.org/transactions/' + encodeURIComponent(clean));
+          return '<a class="tx-link" href="' + escHtml(url) + '" target="_blank" rel="noopener noreferrer" title="Verify transaction ' + escHtml(clean) + ' on XRPL Testnet Explorer">' +
+            '<span>' + escHtml(tx.label) + ' (' + escHtml(short + ledger) + ')</span>' +
+            '<span class="tx-link-badge">Testnet TX ↗</span></a>';
+        }).join('') +
+        '</div>';
+      box.hidden = false;
+    }
+
     function applyAccess(access, startedAt) {
       const hasAccess = scheduleExpiry(access, startedAt);
       const hasWallet = Boolean(access.sessionAddress);
@@ -646,6 +732,7 @@ export function renderCadPortalHtml(): string {
       el('login-actions').hidden = hasWallet;
       for (const button of loginButtons) button.hidden = button.dataset.login === access.role;
       el('project-action').hidden = !hasAccess || Boolean(openedBy);
+      renderCadTxs(access.verifiedTxs);
 
       if (access.code === 'SESSION_REQUIRED') {
         message('Connect wallet', 'Choose a demo profile to check CAD license availability.', 'inactive');

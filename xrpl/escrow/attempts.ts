@@ -139,6 +139,12 @@ export class AttemptStore {
       .all(orderId) as unknown as Attempt[]
   }
 
+  listAllValidated(): Attempt[] {
+    return this.db
+      .prepare(`SELECT * FROM attempts WHERE state = 'validated' ORDER BY rowid ASC`)
+      .all() as unknown as Attempt[]
+  }
+
   get(hash: string): Attempt {
     const row = this.db.prepare('SELECT * FROM attempts WHERE hash = ?').get(hash.toUpperCase())
     if (!row) throw new Error(`Unknown XRPL attempt: ${hash}`)

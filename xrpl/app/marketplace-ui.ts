@@ -244,6 +244,7 @@ export function renderMarketplaceHtml(): string {
         </div>
         <div class="funds-grid" id="funds-grid"></div>
         <p id="funds-note" class="funds-note" hidden></p>
+        <div id="funds-txs" class="funds-txs" hidden></div>
       </section>
     </div>
 
@@ -336,11 +337,16 @@ export function renderMarketplaceHtml(): string {
       for (const item of el.querySelectorAll('details[data-detail]')) item.open = opened.has(item.dataset.detail);
       if (focusKey) Array.from(el.querySelectorAll('[data-focus]')).find((item) => item.dataset.focus === focusKey)?.focus();
     }
-    function notice(message, failed = false) {
+    function notice(message, failed = false, txItem = null) {
       const el = $('feedback');
-      el.hidden = !message;
+      el.hidden = !message && !txItem;
       el.className = 'notice' + (failed ? ' error' : '');
-      el.textContent = message;
+      if (txItem && !failed) {
+        const prefix = message ? html(message) + ' · ' : 'Transaction validated on XRPL · ';
+        el.innerHTML = '<span>' + prefix + '</span>' + txExternalLink(txItem.txHash, txItem.label, txItem.ledgerIndex);
+      } else {
+        el.textContent = message;
+      }
     }
     function inlineError(id, message) {
       $(id).hidden = !message;
@@ -407,6 +413,53 @@ export function renderMarketplaceHtml(): string {
     }
     function detailAttr(key) {
       return ' data-detail="' + html(key) + '"><summary data-focus="' + html('detail:' + key) + '">';
+    }
+    const TESTNET_TX_BASE = 'https://testnet.xrpl.org/transactions/';
+    function txExplorerUrl(hash) {
+      return TESTNET_TX_BASE + encodeURIComponent(String(hash || '').trim().toUpperCase());
+    }
+    function shortHash(hash) {
+      const clean = String(hash || '').trim().toUpperCase();
+      return clean.length > 16 ? clean.slice(0, 8) + '…' + clean.slice(-6) : clean;
+    }
+    function txExternalLink(hash, label = '', ledgerIndex = null) {
+      if (!hash) return '';
+      const clean = String(hash).trim().toUpperCase();
+      const ledgerText = ledgerIndex != null ? ' · #' + ledgerIndex : '';
+      const caption = label ? html(label) + ' (' + html(shortHash(clean)) + html(ledgerText) + ')' : html(clean);
+      return '<a class="tx-link" href="' + html(txExplorerUrl(clean)) + '" target="_blank" rel="noopener noreferrer" title="Verify transaction ' + html(clean) + ' on XRPL Testnet Explorer">' +
+        '<span>' + caption + '</span>' +
+        '<span class="tx-link-badge">Testnet TX ↗</span></a>';
+    }
+    function orderVerifiedTxsList(o) {
+      if (Array.isArray(o.verifiedTxs) && o.verifiedTxs.length) return o.verifiedTxs;
+      const r = o.receipts || {};
+      const fallback = [
+        ['Pass Mint', r.mintTxHash, r.mintLedgerIndex],
+        ...(r.offerTxHash && r.offerTxHash !== r.mintTxHash ? [['Pass Offer', r.offerTxHash, r.offerLedgerIndex]] : []),
+        ['Pass Delivery', r.acceptOfferHash, r.acceptLedgerIndex],
+        ['Escrow Deposit', r.depositLedgerHash ? r.createHash : null, r.depositLedgerIndex],
+        ['Escrow Release', r.releaseTxHash, r.releaseLedgerIndex],
+        ['Vault Settlement (2-of-3)', r.payoutLedgerHash ? r.payoutTxHash : null, r.payoutLedgerIndex],
+        ['Pass Revocation', r.burnTxHash, r.burnLedgerIndex],
+        ['Fee Refund', r.refundLedgerHash ? r.refundTxHash : null, r.refundLedgerIndex],
+      ];
+      return fallback
+        .filter(([, txHash]) => Boolean(txHash))
+        .map(([label, txHash, ledgerIndex]) => ({
+          label,
+          txHash: String(txHash).trim().toUpperCase(),
+          ledgerIndex: ledgerIndex ?? null,
+          explorerUrl: txExplorerUrl(txHash),
+        }));
+    }
+    function renderVerifiedTxsPanel(txs, heading = 'Verified XRPL Testnet Transactions') {
+      if (!txs || !txs.length) return '';
+      return '<div class="tx-verification" aria-label="' + html(heading) + '">' +
+        '<div class="tx-verification-head"><span>' + html(heading) + '</span><span>testnet.xrpl.org</span></div>' +
+        '<div class="tx-links">' +
+        txs.map((tx) => txExternalLink(tx.txHash, tx.label, tx.ledgerIndex)).join('') +
+        '</div></div>';
     }
     function fact(label, value) {
       return '<div><dt>' + html(label) + '</dt><dd>' + html(value) + '</dd></div>';
@@ -573,11 +626,21 @@ export function renderMarketplaceHtml(): string {
       const tone = o.status === 'rejected' ? ' error' : o.vaultHeld && o.status !== 'active' ? ' waiting' : !o.vaultHeld ? ' closed' : '';
       const next = nextStep(o, who);
       const rows = [
-        ['Agreement', o.agreementHash], ['Pass NFT', o.receipts.passNftId], ['Offer', o.receipts.offerId],
-        ['Mint', o.receipts.mintTxHash], ['Pass delivery', o.receipts.acceptOfferHash],
-        ['Deposit', o.receipts.createHash], ['Release', o.receipts.releaseTxHash],
-        ['Settlement', o.receipts.payoutTxHash], ['Revocation', o.receipts.burnTxHash], ['Refund', o.receipts.refundTxHash],
+        ['Agreement', o.agreementHash, false],
+        ['Pass NFT', o.receipts.passNftId, false],
+        ['Offer', o.receipts.offerId, false],
+        ['Mint', o.receipts.mintTxHash, true],
+        ...(o.receipts.offerTxHash && o.receipts.offerTxHash !== o.receipts.mintTxHash
+          ? [['Offer TX', o.receipts.offerTxHash, true]]
+          : []),
+        ['Pass delivery', o.receipts.acceptOfferHash, true],
+        ['Deposit', o.receipts.createHash, true],
+        ['Release', o.receipts.releaseTxHash, true],
+        ['Settlement', o.receipts.payoutTxHash, true],
+        ['Revocation', o.receipts.burnTxHash, true],
+        ['Refund', o.receipts.refundTxHash, true],
       ];
+      const verifiedTxs = orderVerifiedTxsList(o);
       const request = ['awaiting_authority', 'rejected'].includes(o.status);
       const title = request ? (who === 'bob' ? 'Your request' : 'Bob’s request')
         : who === 'bob' ? 'Your rental' : 'Bob’s rental';
@@ -599,8 +662,10 @@ export function renderMarketplaceHtml(): string {
           button('arbitration', 'Prepare refund to Bob', o.orderId, 'secondary', 'arbitration_bob') +
           button('arbitration', 'Prepare payout to Alice', o.orderId, 'secondary', 'arbitration_alice') +
           '</div></details>' : '') +
+        renderVerifiedTxsPanel(verifiedTxs) +
         '<details class="tools"' + detailAttr('receipts:' + o.orderId) + 'XRPL receipts</summary><dl class="receipts">' +
-          rows.filter(([, value]) => value).map(([key, value]) => '<dt>' + html(key) + '</dt><dd>' + html(value) + '</dd>').join('') +
+          rows.filter(([, value]) => value).map(([key, value, isTx]) => '<dt>' + html(key) + '</dt><dd>' +
+            (isTx ? txExternalLink(value) : html(value)) + '</dd>').join('') +
         '</dl></details></article>';
     }
 
@@ -647,6 +712,15 @@ export function renderMarketplaceHtml(): string {
         : payout ? xrp(payout.deliveredDrops) + (payout.beneficiary === 'alice' ? ' settled to Alice.' : ' settled to Bob.')
         : escrow?.creditedDrops ? xrp(escrow.creditedDrops) + ' from this rental credited to vault.' : '';
       note.hidden = !note.textContent;
+      const fundsTxs = $('funds-txs');
+      const protocolTxs = Array.isArray(view?.verifiedTxs) ? view.verifiedTxs : [];
+      if (protocolTxs.length) {
+        setHtml(fundsTxs, renderVerifiedTxsPanel(protocolTxs, 'On-Ledger Setup, Title & Order TXs'));
+        fundsTxs.hidden = false;
+      } else {
+        setHtml(fundsTxs, '');
+        fundsTxs.hidden = true;
+      }
       $('funds').hidden = false;
     }
 
@@ -813,7 +887,10 @@ export function renderMarketplaceHtml(): string {
         const view = result?.order || result;
         await refresh();
         const waiting = view?.pendingStep && view.pendingStep !== 'vault_payout_signatures';
-        notice(waiting ? 'Transaction submitted. The network is verifying it.' : opts.message || '');
+        const latestTx = !waiting && Array.isArray(view?.verifiedTxs) && view.verifiedTxs.length
+          ? view.verifiedTxs[view.verifiedTxs.length - 1]
+          : null;
+        notice(waiting ? 'Transaction submitted. The network is verifying it.' : opts.message || '', false, latestTx);
         if (opts.focus) $(opts.focus).focus();
         else if (restoreFocus && document.activeElement === document.body) {
           if (!control.isConnected) $('work-title').focus();

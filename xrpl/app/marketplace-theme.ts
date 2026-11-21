@@ -1223,6 +1223,76 @@ export const marketplaceStyles = String.raw`
     color: var(--electric);
   }
 
+  /* External XRPL Testnet Transaction Links */
+  .tx-verification {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(0, 191, 255, 0.35);
+    border-inline-start: 3px solid var(--electric);
+    border-radius: var(--radius);
+    background: rgba(0, 191, 255, 0.06);
+  }
+  .tx-verification-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem 0.75rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--electric);
+  }
+  .tx-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+  .tx-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: 100%;
+    padding: 0.32rem 0.65rem;
+    border: 1px solid rgba(0, 191, 255, 0.4);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--ink);
+    font: 500 0.78rem/1.35 var(--mono);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    transition: border-color 180ms var(--spring-ease), background-color 180ms var(--spring-ease), color 180ms var(--spring-ease);
+  }
+  .tx-link:hover {
+    border-color: var(--circuit);
+    background: var(--primary-dim);
+    color: var(--circuit);
+    text-decoration: none;
+  }
+  .tx-link-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.1rem 0.38rem;
+    border-radius: var(--radius-sm);
+    background: var(--electric-dim);
+    color: var(--electric);
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .tx-link:hover .tx-link-badge {
+    background: rgba(110, 250, 95, 0.2);
+    color: var(--circuit);
+  }
+  .funds-txs {
+    border-top: 1px solid var(--neutral);
+    padding: 0.85rem 1.25rem;
+    background: var(--bg-primary);
+  }
+
   .sim-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

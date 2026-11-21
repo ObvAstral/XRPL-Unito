@@ -34,9 +34,11 @@ import {
   type SampleOrderExchange,
   type SettlementUiView,
   type SimulatedPresetName,
+  type VerifiedTestnetTxView,
 } from '../shared/demo-contract.js'
 import type { VaultResolutionMode } from '../shared/escrow-order.js'
 import { adaptLocalSigner, rentalDepositState, toPaymentOrder } from '../shared/rental-bridge.js'
+import { testnetTxExplorerUrl } from '../shared/testnet-node.js'
 import { validateAndDecodeImage } from './image-validator.js'
 import {
   AppStore,
@@ -139,6 +141,7 @@ export interface OrderView {
     readonly refundLedgerHash: string | null
     readonly refundLedgerIndex: number | null
   }
+  readonly verifiedTxs: readonly VerifiedTestnetTxView[]
   readonly settlement: SettlementUiView
 }
 
@@ -170,6 +173,7 @@ export interface ResourceFundsView {
     readonly creditedDrops?: string
   }
   readonly payout: { readonly beneficiary: 'alice' | 'bob'; readonly deliveredDrops: string } | null
+  readonly verifiedTxs: readonly VerifiedTestnetTxView[]
 }
 
 export class RentalPlatformService {
@@ -605,7 +609,8 @@ export class RentalPlatformService {
               deliveredDrops: order.payoutDeliveredDrops,
             }
           : null
-      return { resourceId: resource.resourceId, ledgerIndex: snapshot.index, accounts: { alice, bob, vault }, escrow, payout }
+      const verifiedTxs = this.buildResourceProtocolTxs(resource, order)
+      return { resourceId: resource.resourceId, ledgerIndex: snapshot.index, accounts: { alice, bob, vault }, escrow, payout, verifiedTxs }
     } catch (error) {
       if (error instanceof LedgerUnavailable) {
         throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'Balances temporarily unavailable.')
@@ -1828,6 +1833,7 @@ export class RentalPlatformService {
         refundLedgerHash: order.refundLedgerHash,
         refundLedgerIndex: order.refundLedgerIndex,
       },
+      verifiedTxs: this.buildOrderVerifiedTxs(order),
       settlement: {
         escrowState,
         escrowLabel,
@@ -1840,6 +1846,158 @@ export class RentalPlatformService {
         preparedTransactionJson,
       },
     }
+  }
+
+  private buildOrderVerifiedTxs(order: OrderRecord): VerifiedTestnetTxView[] {
+    const txs: VerifiedTestnetTxView[] = []
+    const pushTx = (
+      key: string,
+      label: string,
+      txType: string,
+      txHash: string | null,
+      ledgerIndex: number | null,
+      isValidated: boolean,
+    ) => {
+      if (!txHash || !isValidated) return
+      const clean = txHash.trim().toUpperCase()
+      if (!clean) return
+      txs.push({
+        key,
+        label,
+        txType,
+        txHash: clean,
+        ledgerIndex,
+        explorerUrl: testnetTxExplorerUrl(clean),
+      })
+    }
+
+    pushTx(
+      'mint',
+      'Pass Mint',
+      'NFTokenMint',
+      order.mintTxHash,
+      order.mintLedgerIndex,
+      Boolean(order.mintLedgerHash || order.mintTxHash),
+    )
+    if (order.offerTxHash && order.offerTxHash !== order.mintTxHash) {
+      pushTx(
+        'offer',
+        'Pass Offer',
+        'NFTokenCreateOffer',
+        order.offerTxHash,
+        order.offerLedgerIndex,
+        Boolean(order.offerLedgerHash || order.offerTxHash),
+      )
+    }
+    pushTx(
+      'accept_pass',
+      'Pass Delivery',
+      'NFTokenAcceptOffer',
+      order.acceptOfferHash,
+      order.acceptLedgerIndex,
+      Boolean(order.acceptLedgerHash || order.acceptOfferHash),
+    )
+    pushTx(
+      'escrow_create',
+      'Escrow Deposit',
+      'EscrowCreate',
+      order.createHash,
+      order.depositLedgerIndex,
+      Boolean(order.depositLedgerHash),
+    )
+    pushTx(
+      'escrow_finish',
+      'Escrow Release',
+      'EscrowFinish',
+      order.releaseTxHash,
+      order.releaseLedgerIndex,
+      Boolean(order.releaseLedgerHash || order.releaseTxHash),
+    )
+    pushTx(
+      'vault_payout',
+      'Vault Settlement (2-of-3)',
+      'Payment',
+      order.payoutTxHash,
+      order.payoutLedgerIndex,
+      Boolean(order.payoutLedgerHash),
+    )
+    pushTx(
+      'burn_pass',
+      'Pass Revocation',
+      'NFTokenBurn',
+      order.burnTxHash,
+      order.burnLedgerIndex,
+      Boolean(order.burnLedgerHash || order.burnTxHash),
+    )
+    pushTx(
+      'fee_refund',
+      'Fee Refund',
+      'Payment',
+      order.refundTxHash,
+      order.refundLedgerIndex,
+      Boolean(order.refundLedgerHash),
+    )
+
+    return txs
+  }
+
+  private buildResourceProtocolTxs(
+    resource: CatalogResourceConfig,
+    order?: OrderRecord,
+  ): VerifiedTestnetTxView[] {
+    const out: VerifiedTestnetTxView[] = []
+    const seen = new Set<string>()
+    const add = (item: VerifiedTestnetTxView) => {
+      if (seen.has(item.txHash)) return
+      seen.add(item.txHash)
+      out.push(item)
+    }
+
+    const setupOrderId = `setup:${resource.scenario}`
+    for (const att of this.runtime.attemptStore.listByOrder(setupOrderId)) {
+      if (att.state === 'validated') {
+        const clean = att.hash.trim().toUpperCase()
+        add({
+          key: att.action,
+          label:
+            att.action === 'vault_signer_list'
+              ? 'Vault SignerList (2-of-3)'
+              : 'Vault Disable Master Key',
+          txType: att.action === 'vault_signer_list' ? 'SignerListSet' : 'AccountSet',
+          txHash: clean,
+          ledgerIndex: att.ledgerIndex,
+          explorerUrl: testnetTxExplorerUrl(clean),
+        })
+      }
+    }
+
+    const titleOrderId = `title:${digestTerms(toTitleTerms(resource))}`
+    for (const nftAtt of this.runtime.nftJournal.listValidated()) {
+      if (nftAtt.orderId === titleOrderId) {
+        const clean = nftAtt.txHash.trim().toUpperCase()
+        const labelMap: Record<string, string> = {
+          NFTokenMint: 'Base Title Mint',
+          NFTokenCreateOffer: 'Base Title Offer',
+          NFTokenAcceptOffer: 'Base Title Claim (Alice)',
+        }
+        add({
+          key: `title_${nftAtt.txType.toLowerCase()}`,
+          label: labelMap[nftAtt.txType] ?? `Base Title (${nftAtt.txType})`,
+          txType: nftAtt.txType,
+          txHash: clean,
+          ledgerIndex: nftAtt.ledgerIndex,
+          explorerUrl: testnetTxExplorerUrl(clean),
+        })
+      }
+    }
+
+    if (order) {
+      for (const tx of this.buildOrderVerifiedTxs(order)) {
+        add(tx)
+      }
+    }
+
+    return out
   }
 
   // --- Shared access control (CAD and Billboard) ---
@@ -1902,6 +2060,9 @@ export class RentalPlatformService {
     const isCad = resource.serviceType === 'cad_portal'
     const resourceShortLabel = isCad ? 'this CAD seat' : `installation ${resource.resourceId}`
 
+    const resourceOrders = this.store.listOrders(resource.resourceId)
+    const relevantOrder = resourceOrders.find((item) => item.vaultHeld === 1) ?? resourceOrders[0]
+
     const baseInfo = {
       resourceId: resource.resourceId,
       serviceType: resource.serviceType,
@@ -1911,6 +2072,7 @@ export class RentalPlatformService {
       role: session.role,
       serverNowUtc: nowUtc,
       serverNowTorino: nowTorino,
+      verifiedTxs: this.buildResourceProtocolTxs(resource, relevantOrder),
     } as const
 
     // Composite verification on a shared validated snapshot (retried once if the node advances during reading).

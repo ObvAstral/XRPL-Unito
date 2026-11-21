@@ -124,6 +124,15 @@ export type OrderLifecycleStatus =
   | 'revoked_unpaid'
   | 'settled'
 
+export interface VerifiedTestnetTxView {
+  readonly key: string
+  readonly label: string
+  readonly txType: string
+  readonly txHash: string
+  readonly ledgerIndex: number | null
+  readonly explorerUrl: string
+}
+
 export interface AccessDecisionView {
   readonly resourceId: string
   readonly serviceType: 'cad_portal' | 'digital_billboard'
@@ -160,6 +169,7 @@ export interface AccessDecisionView {
   readonly ledgerSnapshotIndex: number | null
   readonly serverNowUtc: string
   readonly serverNowTorino: string
+  readonly verifiedTxs?: readonly VerifiedTestnetTxView[]
 }
 
 export interface SettlementUiView {

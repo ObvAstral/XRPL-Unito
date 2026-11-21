@@ -5,6 +5,7 @@ import type { Transaction } from 'xrpl'
 import { readHash, readUint32, readValidatedLedger, recentSnapshot, record } from './pass.js'
 import type { Fields, LedgerRequest, Snapshot } from './pass.js'
 import { RpcError } from './rpc.js'
+import { logValidatedTestnetTx } from '../shared/testnet-node.js'
 
 interface Receipt {
   txHash: string
@@ -88,6 +89,30 @@ export class AttemptJournal {
     this.database.prepare(
       `DELETE FROM attempts WHERE id = ? AND signed = ? AND json_extract(outcome, '$.status') = 'rejected'`,
     ).run(id, JSON.stringify(attempt))
+  }
+
+  listValidated(): Array<{ orderId: string; txType: string; txHash: string; ledgerIndex: number }> {
+    const rows = this.database
+      .prepare(
+        `SELECT id, outcome FROM attempts WHERE json_extract(outcome, '$.status') = 'validated' ORDER BY rowid ASC`,
+      )
+      .all() as Array<{ id: string; outcome: string }>
+    const out: Array<{ orderId: string; txType: string; txHash: string; ledgerIndex: number }> = []
+    for (const row of rows) {
+      try {
+        const parsedId = JSON.parse(String(row.id)) as [string, string, string]
+        const outcome = JSON.parse(String(row.outcome)) as Extract<Outcome, { status: 'validated' }>
+        out.push({
+          orderId: parsedId[1] ?? '',
+          txType: parsedId[2] ?? 'NFTokenTx',
+          txHash: outcome.receipt.txHash,
+          ledgerIndex: outcome.receipt.ledgerIndex,
+        })
+      } catch {
+        // ignore malformed row
+      }
+    }
+    return out
   }
 
   close() {
@@ -215,6 +240,16 @@ export async function runTransaction<T extends Transaction>(options: RunOptions<
       }
     }
   }
-  if (outcome.status !== 'pending') journal.finish(id, attempt, outcome)
+  if (outcome.status !== 'pending') {
+    journal.finish(id, attempt, outcome)
+    if (outcome.status === 'validated') {
+      logValidatedTestnetTx({
+        label: tx.TransactionType,
+        txHash: outcome.receipt.txHash,
+        ledgerIndex: outcome.receipt.ledgerIndex,
+        orderId,
+      })
+    }
+  }
   return outcome
 }
