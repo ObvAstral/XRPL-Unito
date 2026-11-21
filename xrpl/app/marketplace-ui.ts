@@ -43,7 +43,7 @@ export function renderMarketplaceHtml(): string {
     <div id="workspace" class="workspace" hidden>
       <div id="resource-picker" class="resource-tabs" role="group" aria-label="Scegli la risorsa">
         <button type="button" data-action="resource" data-id="cad" aria-pressed="true">Posto CAD</button>
-        <button type="button" data-action="resource" data-id="torino-01" aria-pressed="false">Cartellone</button>
+        <button type="button" data-action="resource" data-id="torino-01" aria-pressed="false">Cartellone pubblicitario</button>
       </div>
       <section class="stack" aria-labelledby="resource-name">
         <div class="resource-head">
@@ -391,7 +391,7 @@ export function renderMarketplaceHtml(): string {
       const access = state.access?.resourceId === resourceId ? state.access : null;
       $('resource-picker').hidden = isAuthority;
       for (const tab of $('resource-picker').querySelectorAll('button')) tab.setAttribute('aria-pressed', String(tab.dataset.id === resourceId));
-      $('resource-name').textContent = resourceId === 'cad' ? 'Posto CAD' : 'Cartellone digitale';
+      $('resource-name').textContent = resourceId === 'cad' ? 'Posto CAD' : 'Cartellone pubblicitario';
       const subtitle = $('resource-subtitle');
       subtitle.textContent = resource?.displayName.split(' · ').at(-1) || '';
       subtitle.hidden = !subtitle.textContent;
@@ -522,7 +522,7 @@ export function renderMarketplaceHtml(): string {
       $('billboard-upload').hidden = true;
       $('funds').hidden = true;
       setHtml($('work-cards'), '<p class="muted">Caricamento…</p>');
-      $('resource-name').textContent = id === 'cad' ? 'Posto CAD' : 'Cartellone digitale';
+      $('resource-name').textContent = id === 'cad' ? 'Posto CAD' : 'Cartellone pubblicitario';
       $('resource-subtitle').hidden = true;
       $('service-link').hidden = true;
       setHtml($('access-state'), '');
@@ -639,7 +639,7 @@ export function renderMarketplaceHtml(): string {
       ctx.font = '600 52px system-ui';
       ctx.fillText('Campagna di Bob', 56, 206);
       ctx.font = '22px system-ui';
-      ctx.fillText('Cartellone digitale · Torino', 56, 256);
+      ctx.fillText('Cartellone pubblicitario · Torino', 56, 256);
       const image = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
       if (!image) throw new Error('Immagine di esempio non disponibile.');
       await uploadImage(image);

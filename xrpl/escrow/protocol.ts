@@ -200,7 +200,7 @@ export function resolveVaultSettlement(
     case 'ordinary':
       return {
         beneficiary: order.alice,
-        allowedSigners: [order.alice, order.bob],
+        allowedSigners: [order.alice, order.bob, order.authority],
       }
     case 'arbitration_alice':
       return {

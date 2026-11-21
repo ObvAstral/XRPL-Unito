@@ -654,13 +654,14 @@ for (const combinedMintOffer of [false, true]) {
     assert.deepEqual(afterRelease.escrow, { state: 'credited_to_vault', lockedDrops: '0', creditedDrops: '9000000' })
     assert.equal(BigInt(afterRelease.accounts.vault!.balanceDrops) - BigInt(afterDeposit.accounts.vault!.balanceDrops), 9_000_000n)
 
-    // Raccolta firme 2 su 3: 1 firma lascia in attesa di firma; 2 firme pagano tutti i 9 XRP ad Alice.
-    const prep = await h.api<{ progress: { phase: string } }>(
+    // Alice e il fornitore CAD liquidano tutti i 9 XRP con due firme.
+    const prep = await h.api<{ order: OrderView; progress: { phase: string } }>(
       `/api/ordini/${order.orderId}/liquidazione`,
       { method: 'POST', sessionRef: aliceRef, body: { action: 'prepare', mode: 'ordinary' } },
     )
     assert.equal(prep.status, 200)
     assert.equal(prep.data.progress.phase, 'awaiting_signatures')
+    assert.deepEqual(prep.data.order.settlement.allowedSigners, [aliceAddr, bobAddr, authAddr])
 
     const sig1 = await h.api<{ tx_blob: string }>('/api/local-signer/vault-signature', {
       method: 'POST',
@@ -675,11 +676,11 @@ for (const combinedMintOffer of [false, true]) {
 
     const sig2 = await h.api<{ tx_blob: string }>('/api/local-signer/vault-signature', {
       method: 'POST',
-      body: { orderId: order.orderId, role: 'bob' },
+      body: { orderId: order.orderId, role: 'cad' },
     })
     const after2 = await h.api<{ order: OrderView; progress: { phase: string } }>(
       `/api/ordini/${order.orderId}/liquidazione`,
-      { method: 'POST', sessionRef: bobRef, body: { action: 'sign', partialTxBlob: sig2.data.tx_blob } },
+      { method: 'POST', sessionRef: cadRef, body: { action: 'sign', partialTxBlob: sig2.data.tx_blob } },
     )
     assert.equal(after2.data.progress.phase, 'validated')
     assert.equal(after2.data.order.status, 'settled')
@@ -846,12 +847,48 @@ test('Prova 3 · Cartellone torino-01 (bianco -> PNG/JPEG -> bianco), 503 offlin
   assert.equal(curAfterExpiry.data.imageUrl, null)
   assert.equal((await h.api('/api/cartelloni/torino-01/immagine-file')).status, 404)
 
-  await h.api(`/api/ordini/${bbOrder.orderId}/sblocco`, { method: 'POST', sessionRef: aliceRef })
-  await h.api(`/api/ordini/${bbOrder.orderId}/liquidazione`, {
+  const { alice: aliceAddr, billboardAuthority: comuneAddr } = h.runtime.setup.participants
+  const aliceBeforePayout = h.node.getBalanceDrops(aliceAddr)
+  const released = await h.api<OrderView>(`/api/ordini/${bbOrder.orderId}/sblocco`, {
     method: 'POST',
-    sessionRef: aliceRef,
-    body: { action: 'settle', mode: 'ordinary' },
+    sessionRef: comuneRef,
   })
+  assert.equal(released.data.settlement.escrowState, 'credited_to_vault')
+
+  const payoutUrl = `/api/ordini/${bbOrder.orderId}/liquidazione`
+  const prepared = await h.api<{ order: OrderView }>(payoutUrl, {
+    method: 'POST',
+    sessionRef: comuneRef,
+    body: { action: 'prepare', mode: 'ordinary' },
+  })
+  assert.equal(prepared.data.order.settlement.payoutPhase, 'awaiting_signatures')
+  assert.deepEqual(prepared.data.order.settlement.allowedSigners, [aliceAddr, bobAddr, comuneAddr])
+
+  const comuneSignature = await h.api<{ tx_blob: string }>('/api/local-signer/vault-signature', {
+    method: 'POST',
+    body: { orderId: bbOrder.orderId, role: 'comune' },
+  })
+  const afterComune = await h.api<{ order: OrderView }>(payoutUrl, {
+    method: 'POST',
+    sessionRef: comuneRef,
+    body: { action: 'sign', partialTxBlob: comuneSignature.data.tx_blob },
+  })
+  assert.equal(afterComune.data.order.settlement.payoutPhase, 'awaiting_signatures')
+  assert.deepEqual(afterComune.data.order.settlement.collectedSigners, [comuneAddr])
+  assert.equal(h.node.getBalanceDrops(aliceAddr), aliceBeforePayout)
+
+  const bobSignature = await h.api<{ tx_blob: string }>('/api/local-signer/vault-signature', {
+    method: 'POST',
+    body: { orderId: bbOrder.orderId, role: 'bob' },
+  })
+  const settled = await h.api<{ order: OrderView }>(payoutUrl, {
+    method: 'POST',
+    sessionRef: bobRef,
+    body: { action: 'sign', partialTxBlob: bobSignature.data.tx_blob },
+  })
+  assert.equal(settled.data.order.status, 'settled')
+  assert.equal(settled.data.order.receipts.payoutDeliveredDrops, '9000000')
+  assert.equal(h.node.getBalanceDrops(aliceAddr) - aliceBeforePayout, 9_000_000n)
 
   // 3. Ordine con checkout interrotto dopo consegna del pass -> perdita risposta sul rimborso -> riavvio -> ripresa unica.
   const abortedOrder = await h.publishAndAcceptOrder({

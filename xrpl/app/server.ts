@@ -389,7 +389,7 @@ export function createAppServer(service: RentalPlatformService): {
         return
       }
 
-      // --- Cartellone Digitale ---
+      // --- Cartellone pubblicitario ---
       const bbUploadMatch = /^\/api\/cartelloni\/([^/]+)\/immagine$/.exec(pathname)
       if (method === 'POST' && bbUploadMatch?.[1]) {
         const raw = await readRawBody(req, MAX_UPLOAD_BODY)

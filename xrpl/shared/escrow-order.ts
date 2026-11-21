@@ -2,7 +2,7 @@ export type VaultScenario = 'cad' | 'billboard'
 
 /**
  * Modalita' di liquidazione del saldo maturato nel vault 2 su 3:
- * - ordinary: fine affitto regolare -> firme Alice + Bob -> beneficiario Alice
+ * - ordinary: pagamento ad Alice con due firme tra Alice, Bob ed ente competente
  * - arbitration_alice: contestazione vinta da Alice -> firme Ente + Alice -> beneficiario Alice
  * - arbitration_bob: contestazione vinta da Bob -> firme Ente + Bob -> beneficiario Bob
  * - inadmissible_refund: ordine risultato inammissibile con netto gia' bloccato -> 2 firme tra {Alice, Bob, Ente} -> beneficiario Bob

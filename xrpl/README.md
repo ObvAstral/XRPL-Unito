@@ -37,6 +37,7 @@ Punto d’ingresso: `xrpl/escrow/index.ts` (tipi condivisi in `xrpl/shared/escro
   - Superato `FinishAfter` sul tempo del ledger, invia `EscrowFinish` dall’account operativo e restituisce la ricevuta di accredito sul vault.
 - **Liquidazione multifirma 2-su-3 (`prepareVaultPayout` + `addVaultSignature` oppure `settleVault`):**
   - Prepara una sola volta `Payment` con `SigningPubKey: ""` e `client.autofill(tx, 2)` (`Fee >= 3x`). Espone `phase: 'awaiting_signatures'` ("in attesa di firma") finché non arrivano due firme valide coerenti con `VaultResolutionMode` (`'ordinary'`, `'arbitration_alice'`, `'arbitration_bob'`, `'inadmissible_refund'`), poi combina i blob con `xrpl.multisign`, registra l’hash prima del `submit`, espone `'awaiting_ledger'` ("in attesa del ledger") e verifica `delivered_amount === netDrops` (es. tutti i 9 XRP al beneficiario).
+  - La liquidazione ordinaria ad Alice richiede due firme distinte tra Alice, Bob e l’ente competente per la risorsa.
 - **Rimborso fee per checkout interrotto (`EscrowService.refundFee(order, acceptOfferHash, authoritySigner)`):**
   - Dopo `checkoutDeadline`, riconcilia prima eventuali depositi `pending`, controlla l’assenza di escrow attivi di Bob, verifica nei metadati validati di `NFTokenAcceptOffer` che la fee sia stata realmente incassata dall’ente e invia al massimo un `Payment` di `feeDrops` a Bob.
 - **Riconciliazione e sblocco riserva vault (`EscrowService.reconcileOrder(orderId)`):**
@@ -119,7 +120,7 @@ XRPL_MODE=testnet npm --prefix xrpl start
 
 - `GET /` — Marketplace con scelta del wallet e della risorsa. **Movimenti XRP** mostra su uno stesso ledger validato i saldi di Alice, Bob e del vault e l’importo bloccato nell’escrow. Il saldo disponibile esclude la riserva XRPL. Per ogni ordine viene mostrata l’azione del ruolo collegato.
 - `GET /cad` — Portale CAD dimostrativo con pulsante **Apri progetto demo**, testi per Alice e Bob in fuso `Europe/Rome`, polling ogni 2 secondi e chiusura automatica alla scadenza.
-- `GET /schermo/torino-01` — Player a pieno schermo del cartellone digitale: bianco prima della pubblicazione e alla scadenza, immagine `object-fit: cover` durante il periodo autorizzato.
+- `GET /schermo/torino-01` — Player a pieno schermo del cartellone pubblicitario: bianco prima della pubblicazione e alla scadenza, immagine `object-fit: cover` durante il periodo autorizzato.
 
 ### API principali (convenzioni v2)
 

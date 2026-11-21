@@ -16,7 +16,7 @@ import {
 import { WalletLogin, signLogin, type LoginChallenge } from '../agreement/wallet-login.js'
 import { verifyWalletSignature, type LocalSigner } from '../agreement/wallet.js'
 import { LedgerUnavailable, type OrderEscrowStatus, type ValidatedLedger } from '../escrow/ledger.js'
-import { splitRentalAmount } from '../escrow/protocol.js'
+import { resolveVaultSettlement, splitRentalAmount } from '../escrow/protocol.js'
 import type { VaultPayoutProgress } from '../escrow/service.js'
 import { rippleTime } from '../nft/pass.js'
 import { verifyRentalPass, verifyRentalTitle } from '../nft/rental.js'
@@ -321,7 +321,7 @@ export class RentalPlatformService {
     const bbConfig: CatalogResourceConfig = {
       resourceId: 'torino-01',
       aliases: [],
-      displayName: 'Cartellone Digitale · Torino 01',
+      displayName: 'Cartellone pubblicitario · Torino 01',
       serviceType: 'digital_billboard',
       scenario: 'billboard',
       authorityName: 'Comune di Torino (simulato)',
@@ -1634,34 +1634,6 @@ export class RentalPlatformService {
     let preparedTransactionJson: string | null = null
     let resolutionMode: VaultResolutionMode | null = order.payoutResolutionMode
 
-    if (order.createHash) {
-      try {
-        const bundle = JSON.parse(order.bundleJson) as RentalBundle
-        const rental = verifyRental(bundle, toRentalResource(resource))
-        const paymentOrder = toPaymentOrder(rental, resource.scenario, {
-          passNftId: order.passNftId ?? undefined,
-          offerId: order.offerId ?? undefined,
-          acceptOfferHash: order.acceptOfferHash ?? undefined,
-          createHash: order.createHash,
-        })
-        const snap = await this.runtime.escrowLedger.snapshot()
-        const esc = await this.runtime.escrowLedger.verifyEscrowAt(
-          { ...paymentOrder, createHash: order.createHash },
-          snap,
-        )
-        escrowState = esc.state
-        if (esc.state === 'locked') escrowLabel = 'Deposito bloccato nell’escrow'
-        else if (esc.state === 'releasable') escrowLabel = 'Sbloccabile (EscrowFinish pronto)'
-        else if (esc.state === 'credited_to_vault') escrowLabel = 'Accreditato al vault'
-        else if (esc.state === 'pending') escrowLabel = 'In attesa del ledger'
-        else if (esc.state === 'missing') escrowLabel = 'Assente'
-        else if (esc.state === 'mismatch') escrowLabel = 'Incoerente'
-      } catch {
-        escrowState = 'unavailable'
-        escrowLabel = 'Ledger indisponibile'
-      }
-    }
-
     if (order.payoutLedgerHash && order.payoutTxHash) {
       payoutPhase = 'validated'
       payoutLabel = 'Liquidazione validata'
@@ -1679,10 +1651,37 @@ export class RentalPlatformService {
           (s): s is string => typeof s === 'string',
         )
         preparedTransactionJson = draft.preparedTxJson
-        if (draft.resolutionMode === 'ordinary') allowedSigners = [order.alice, order.bob]
-        else if (draft.resolutionMode === 'arbitration_alice') allowedSigners = [order.issuer, order.alice]
-        else if (draft.resolutionMode === 'arbitration_bob') allowedSigners = [order.issuer, order.bob]
-        else allowedSigners = [order.alice, order.bob, order.issuer]
+      }
+    }
+
+    if (order.createHash) {
+      try {
+        const bundle = JSON.parse(order.bundleJson) as RentalBundle
+        const rental = verifyRental(bundle, toRentalResource(resource))
+        const paymentOrder = toPaymentOrder(rental, resource.scenario, {
+          passNftId: order.passNftId ?? undefined,
+          offerId: order.offerId ?? undefined,
+          acceptOfferHash: order.acceptOfferHash ?? undefined,
+          createHash: order.createHash,
+        })
+        if (payoutPhase === 'awaiting_signatures' && resolutionMode) {
+          allowedSigners = resolveVaultSettlement(paymentOrder, resolutionMode).allowedSigners
+        }
+        const snap = await this.runtime.escrowLedger.snapshot()
+        const esc = await this.runtime.escrowLedger.verifyEscrowAt(
+          { ...paymentOrder, createHash: order.createHash },
+          snap,
+        )
+        escrowState = esc.state
+        if (esc.state === 'locked') escrowLabel = 'Deposito bloccato nell’escrow'
+        else if (esc.state === 'releasable') escrowLabel = 'Sbloccabile (EscrowFinish pronto)'
+        else if (esc.state === 'credited_to_vault') escrowLabel = 'Accreditato al vault'
+        else if (esc.state === 'pending') escrowLabel = 'In attesa del ledger'
+        else if (esc.state === 'missing') escrowLabel = 'Assente'
+        else if (esc.state === 'mismatch') escrowLabel = 'Incoerente'
+      } catch {
+        escrowState = 'unavailable'
+        escrowLabel = 'Ledger indisponibile'
       }
     }
 
@@ -2325,7 +2324,7 @@ export class RentalPlatformService {
     }
   }
 
-  // --- Cartellone Digitale ---
+  // --- Cartellone pubblicitario ---
 
   async uploadBillboardImage(
     sessionRef: string | null,
@@ -2334,7 +2333,7 @@ export class RentalPlatformService {
   ): Promise<BillboardPublicationRecord> {
     const access = await this.evaluateResourceAccess(sessionRef, rawResourceId)
     if (access.serviceType !== 'digital_billboard') {
-      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'La risorsa selezionata non è un cartellone digitale.')
+      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'La risorsa selezionata non è un cartellone pubblicitario.')
     }
     if (!access.canAccess) {
       throw new HttpError(access.httpStatus, access.code, access.reason)
@@ -2375,7 +2374,7 @@ export class RentalPlatformService {
   async getBillboardCurrent(rawResourceId: string): Promise<BillboardCurrentView> {
     const resource = this.requireResource(rawResourceId)
     if (resource.serviceType !== 'digital_billboard') {
-      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'La risorsa selezionata non è un cartellone digitale.')
+      throw new HttpError(400, 'NOT_BILLBOARD_RESOURCE', 'La risorsa selezionata non è un cartellone pubblicitario.')
     }
     const nowUtc = this.nowUtc()
     const pub = this.store.getBillboardPublication(resource.resourceId)
