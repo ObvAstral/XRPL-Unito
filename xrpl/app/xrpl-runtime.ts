@@ -22,6 +22,7 @@ import {
 import {
   ASF_DISABLE_MASTER,
   AMENDMENTS_LEDGER_ENTRY_ID,
+  FEE_SETTINGS_LEDGER_ENTRY_ID,
   LSF_DISABLE_MASTER,
   NFTOKEN_MINT_OFFER_AMENDMENT_ID,
   RIPPLE_EPOCH_SECONDS,
@@ -753,6 +754,19 @@ export class SimulatedXrplNode {
       }
       case 'ledger_entry': {
         const snap = this.resolveSnapshot(fields)
+        if (fields.index === FEE_SETTINGS_LEDGER_ENTRY_ID) {
+          return {
+            validated: true,
+            ledger_hash: snap.hash,
+            index: FEE_SETTINGS_LEDGER_ENTRY_ID,
+            node: {
+              LedgerEntryType: 'FeeSettings',
+              BaseFeeDrops: '10',
+              ReserveBaseDrops: '1000000',
+              ReserveIncrementDrops: '200000',
+            },
+          }
+        }
         if (fields.index === AMENDMENTS_LEDGER_ENTRY_ID) {
           return {
             validated: true,

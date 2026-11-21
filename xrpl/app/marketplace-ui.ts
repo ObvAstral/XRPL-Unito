@@ -1,3 +1,5 @@
+import { marketplaceStyles } from './marketplace-theme.js'
+
 export function renderMarketplaceHtml(): string {
   return String.raw`<!doctype html>
 <html lang="it">
@@ -5,115 +7,7 @@ export function renderMarketplaceHtml(): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Affitti XRPL · Marketplace</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --page: #f3f6f5;
-      --surface: #fff;
-      --ink: #132725;
-      --muted: #516661;
-      --line: #d9e4e0;
-      --accent: #076455;
-      --accent-hover: #064b40;
-      --tint: #e4f2ed;
-      --warning: #785218;
-      --warning-bg: #fff3d9;
-      --error: #a0262d;
-      --error-bg: #fff1f1;
-      --radius: 1rem;
-      --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-    }
-    * { box-sizing: border-box; }
-    [hidden] { display: none !important; }
-    body { margin: 0; background: var(--page); color: var(--ink); font: 1rem/1.55 var(--sans); }
-    h1, h2, h3, p, dl, dd { margin: 0; }
-    h1, h2, h3 { line-height: 1.15; letter-spacing: -.025em; }
-    h1 { font-size: clamp(2rem, 5vw, 3.15rem); }
-    h2 { font-size: 1.35rem; }
-    h3 { font-size: 1.16rem; }
-    a { color: var(--accent); text-underline-offset: .18em; }
-    :focus-visible { outline: 3px solid #188e78; outline-offset: 3px; }
-    button, input, select, textarea { font: inherit; }
-    button, .button {
-      display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem;
-      padding: .55rem 1rem; border: 1px solid transparent; border-radius: .65rem;
-      background: var(--accent); color: #fff; line-height: 1.3; font-weight: 650;
-      text-decoration: none; cursor: pointer;
-    }
-    button:hover, .button:hover { background: var(--accent-hover); }
-    button:disabled { opacity: .52; cursor: default; }
-    .secondary { color: var(--accent); background: var(--surface); border-color: var(--line); }
-    .secondary:hover { background: var(--tint); }
-    .danger { color: var(--error); }
-    .danger:hover { background: var(--error-bg); }
-    .quiet { background: transparent; padding-inline: .5rem; }
-    input, select, textarea {
-      width: 100%; min-height: 2.75rem; padding: .5rem .7rem; border: 1px solid #adbfb9;
-      border-radius: .55rem; background: var(--surface); color: var(--ink);
-    }
-    label { display: grid; gap: .3rem; font-weight: 600; }
-    label small { color: var(--muted); font-weight: 400; }
-    small, .small { font-size: .875rem; }
-    .muted { color: var(--muted); }
-    .bar { border-bottom: 1px solid var(--line); background: var(--surface); }
-    .bar-content, main { width: min(100% - 2rem, 60rem); margin-inline: auto; }
-    .bar-content { display: flex; align-items: center; justify-content: space-between; gap: .5rem 1rem; min-height: 4.25rem; padding-block: .5rem; }
-    .brand { color: var(--ink); font-weight: 750; text-decoration: none; letter-spacing: -.02em; white-space: nowrap; }
-    .identity { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .15rem .65rem; }
-    .mode { font-size: .85rem; color: var(--muted); white-space: nowrap; }
-    .mode::before { content: ""; display: inline-block; margin-right: .4rem; width: .45rem; height: .45rem; border-radius: 50%; background: #57867a; vertical-align: .12rem; }
-    main { padding-block: clamp(1.5rem, 4vw, 3.25rem); display: grid; gap: 1.25rem; }
-    .hero { display: grid; gap: 1.1rem; }
-    .hero p { color: var(--muted); }
-    .role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
-    .role-tile {
-      display: grid; gap: .2rem; text-align: left; justify-content: stretch; min-height: 5.5rem;
-      padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius);
-      color: var(--ink); background: var(--surface);
-    }
-    .role-tile:hover { background: var(--tint); border-color: #9dbeb3; }
-    .role-tile span { color: var(--muted); font-size: .9rem; font-weight: 400; }
-    .resource-tabs { display: flex; gap: .3rem; padding: .28rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--surface); width: fit-content; max-width: 100%; }
-    .resource-tabs button { background: transparent; color: var(--muted); padding-inline: .95rem; }
-    .resource-tabs button[aria-pressed="true"] { background: var(--tint); color: var(--accent-hover); }
-    .resource-tabs button:not([aria-pressed="true"]):hover { background: var(--page); color: var(--ink); }
-    .resource-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: .8rem 1rem; }
-    .resource-head p { margin-top: .4rem; }
-    .workspace, .stack { display: grid; gap: 1rem; min-width: 0; }
-    .panel { padding: clamp(1rem, 3vw, 1.55rem); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
-    .panel-title { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: start; justify-content: space-between; }
-    .status { display: inline-block; border-radius: .45rem; padding: .24rem .55rem; background: var(--tint); color: var(--accent-hover); font-size: .875rem; font-weight: 650; }
-    .status.waiting { background: var(--warning-bg); color: var(--warning); }
-    .status.closed { background: var(--page); color: var(--muted); }
-    .status.error { background: var(--error-bg); color: var(--error); }
-    .access-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: .3rem .75rem; }
-    .access-line p, .empty { color: var(--muted); }
-    .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem 1rem; padding: .85rem 0; border-block: 1px solid var(--line); }
-    .facts dt { color: var(--muted); font-size: .875rem; }
-    .facts dd { font-weight: 650; overflow-wrap: anywhere; }
-    .row { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
-    .next { display: grid; gap: .65rem; }
-    .notice { padding: .7rem 1rem; border-radius: .65rem; background: var(--tint); color: var(--accent-hover); }
-    .notice.error { background: var(--error-bg); color: var(--error); }
-    .inline-error { color: var(--error); overflow-wrap: anywhere; }
-    details { min-width: 0; }
-    details summary { cursor: pointer; font-size: .9rem; font-weight: 650; color: var(--accent); }
-    details[open] > summary { margin-bottom: .7rem; }
-    details.tools { padding-top: .8rem; border-top: 1px solid var(--line); }
-    .receipts { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: .4rem .8rem; font-size: .875rem; }
-    .receipts dt { color: var(--muted); }
-    .receipts dd { overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
-    .sim-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; align-items: end; }
-    dialog { width: min(32rem, 100% - 2rem); padding: 1.4rem; border: 1px solid var(--line); border-radius: var(--radius); color: var(--ink); box-shadow: 0 16px 42px #18342d30; max-height: calc(100dvh - 2rem); }
-    dialog::backdrop { background: #142c2766; }
-    .date-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
-    @media (max-width: 34rem) {
-      .bar-content { flex-wrap: wrap; }
-      .facts, .date-fields { grid-template-columns: 1fr; }
-      .sim-row { grid-template-columns: 1fr; }
-      .receipts { grid-template-columns: 1fr; }
-    }
-  </style>
+  <style>${marketplaceStyles}</style>
 </head>
 <body>
   <header class="bar">
@@ -160,6 +54,14 @@ export function renderMarketplaceHtml(): string {
           <a id="service-link" class="button secondary" hidden></a>
         </div>
         <div id="access-state" class="access-line" aria-live="polite"></div>
+      </section>
+      <section id="funds" class="funds-panel" hidden aria-labelledby="funds-title">
+        <div class="funds-heading">
+          <h2 id="funds-title">Movimenti XRP</h2>
+          <span id="funds-ledger" class="funds-ledger" hidden></span>
+        </div>
+        <div class="funds-grid" id="funds-grid"></div>
+        <p id="funds-note" class="funds-note" hidden></p>
       </section>
       <div id="work-cards" class="stack"></div>
       <section id="billboard-upload" class="panel stack" hidden aria-labelledby="upload-title">
@@ -229,7 +131,7 @@ export function renderMarketplaceHtml(): string {
     });
     const state = {
       selected: new URL(location.href).searchParams.get('risorsa') === 'torino-01' ? 'torino-01' : 'cad',
-      session: null, sim: null, resources: [], listings: [], orders: [], access: null,
+      session: null, sim: null, resources: [], listings: [], orders: [], access: null, funds: null,
       choosing: false, busy: false, version: 0,
     };
     let listingDraft = null;
@@ -448,6 +350,41 @@ export function renderMarketplaceHtml(): string {
         '</article>';
     }
 
+    function fundsMetric(id, label, drops, caption) {
+      return '<div class="funds-metric" data-account="' + id + '">' +
+        '<span class="funds-label">' + html(label) + '</span>' +
+        '<strong class="funds-amount">' + (drops == null ? '—' : html(xrp(drops))) + '</strong>' +
+        '<small class="funds-caption">' + html(caption) + '</small></div>';
+    }
+
+    function renderFunds(resourceId) {
+      const view = state.funds?.resourceId === resourceId ? state.funds : null;
+      const accounts = view?.accounts;
+      const escrow = view?.escrow;
+      const caption = (account) => account ? xrp(account.spendableDrops) + ' disponibili'
+        : view ? 'Account non attivo' : 'Saldo indisponibile';
+      const captions = {
+        not_created: 'Nessun deposito', pending: 'Deposito in verifica', locked: 'Deposito bloccato',
+        releasable: 'Pronto per lo sblocco', credited_to_vault: 'Trasferito al vault',
+        missing: 'Deposito assente', mismatch: 'Deposito da verificare', unavailable: 'Verifica indisponibile',
+      };
+      setHtml($('funds-grid'),
+        fundsMetric('bob', 'Saldo di Bob', accounts?.bob?.balanceDrops, caption(accounts?.bob)) +
+        fundsMetric('escrow', 'XRP in escrow', escrow?.lockedDrops, captions[escrow?.state] || 'Verifica indisponibile') +
+        fundsMetric('vault', 'Saldo del vault', accounts?.vault?.balanceDrops, caption(accounts?.vault)) +
+        fundsMetric('alice', 'Saldo di Alice', accounts?.alice?.balanceDrops, caption(accounts?.alice)));
+      const ledger = $('funds-ledger');
+      ledger.hidden = !view;
+      ledger.textContent = view ? 'Ledger validato #' + view.ledgerIndex.toLocaleString('it-IT') : '';
+      const payout = view?.payout;
+      const note = $('funds-note');
+      note.textContent = !view ? 'Saldi temporaneamente indisponibili.'
+        : payout ? xrp(payout.deliveredDrops) + (payout.beneficiary === 'alice' ? ' liquidati ad Alice.' : ' liquidati a Bob.')
+        : escrow?.creditedDrops ? xrp(escrow.creditedDrops) + ' di questo affitto accreditati al vault.' : '';
+      note.hidden = !note.textContent;
+      $('funds').hidden = false;
+    }
+
     function renderWorkspace(who, resourceId) {
       const isAuthority = state.session.role === 'authority';
       const resource = state.resources.find((item) => item.resourceId === resourceId);
@@ -481,6 +418,7 @@ export function renderMarketplaceHtml(): string {
         ? '<span class="status' + (access.canAccess ? '' : ' waiting') + '">' + html(access.headline) + '</span>'
         : '<span class="muted small">Verifica dell’accesso…</span>');
       $('access-state').hidden = isAuthority || repeated;
+      renderFunds(resourceId);
       const archive = closed.filter((o) => !featured.includes(o));
       const canPublish = who === 'alice' && Date.parse(resource?.validTo) > now();
       const publish = canPublish && !reserved && !rejected
@@ -558,15 +496,17 @@ export function renderMarketplaceHtml(): string {
         return;
       }
       const id = selectedResource();
-      const [orders, listings, access] = await Promise.all([
+      const [orders, listings, access, funds] = await Promise.all([
         api('/api/ordini?resourceId=' + encodeURIComponent(id)),
         session.role === 'authority' ? [] : api('/api/annunci'),
         session.role === 'authority' ? null : fetch('/api/risorse/' + encodeURIComponent(id) + '/accesso').then((res) => res.json()),
+        api('/api/risorse/' + encodeURIComponent(id) + '/fondi').catch(() => null),
       ]);
       if (version !== state.version) return;
       state.orders = orders;
       state.listings = listings;
       state.access = access?.headline ? access : null;
+      state.funds = funds;
       render();
     }
 
@@ -580,6 +520,7 @@ export function renderMarketplaceHtml(): string {
       state.listings = [];
       state.access = null;
       $('billboard-upload').hidden = true;
+      $('funds').hidden = true;
       setHtml($('work-cards'), '<p class="muted">Caricamento…</p>');
       $('resource-name').textContent = id === 'cad' ? 'Posto CAD' : 'Cartellone digitale';
       $('resource-subtitle').hidden = true;

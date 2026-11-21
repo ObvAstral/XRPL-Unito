@@ -117,14 +117,14 @@ XRPL_MODE=testnet npm --prefix xrpl start
 
 ### Superfici web servite
 
-- `GET /` — Marketplace con scelta del wallet e della risorsa. Per ogni ordine mostra lo stato e l’azione disponibile al ruolo collegato. Apri **Ricevute XRPL** per gli hash o **Comandi della simulazione** per i preset CAD e i salti di fase.
+- `GET /` — Marketplace con scelta del wallet e della risorsa. **Movimenti XRP** mostra su uno stesso ledger validato i saldi di Alice, Bob e del vault e l’importo bloccato nell’escrow. Il saldo disponibile esclude la riserva XRPL. Per ogni ordine viene mostrata l’azione del ruolo collegato.
 - `GET /cad` — Portale CAD dimostrativo con pulsante **Apri progetto demo**, testi per Alice e Bob in fuso `Europe/Rome`, polling ogni 2 secondi e chiusura automatica alla scadenza.
 - `GET /schermo/torino-01` — Player a pieno schermo del cartellone digitale: bianco prima della pubblicazione e alla scadenza, immagine `object-fit: cover` durante il periodo autorizzato.
 
 ### API principali (convenzioni v2)
 
 - `POST /api/wallet/challenge`, `POST /api/wallet/session`, `GET /api/wallet/session`, `DELETE /api/wallet/session`
-- `GET /api/risorse`, `GET /api/risorse/{id}/accesso`, `GET /api/scambio/esempio-cad`
+- `GET /api/risorse`, `GET /api/risorse/{id}/accesso`, `GET /api/risorse/{id}/fondi`, `GET /api/scambio/esempio-cad`
 - `GET /api/annunci`, `POST /api/annunci`, `POST /api/annunci/{id}/ordini`
 - `GET /api/ordini`, `GET /api/ordini/{id}`, `POST /api/ordini/{id}/decisione`, `POST /api/ordini/{id}/pass/accetta`, `POST /api/ordini/{id}/deposito`, `POST /api/ordini/{id}/sblocco`, `POST /api/ordini/{id}/liquidazione`, `POST /api/ordini/{id}/recupero`, `POST /api/ordini/{id}/riconcilia`
 - `GET /api/cad/{id}/progetto`

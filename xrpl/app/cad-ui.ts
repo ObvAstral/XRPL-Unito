@@ -1,3 +1,5 @@
+import { demoThemeTokens } from './marketplace-theme.js'
+
 export function renderCadPortalHtml(): string {
   return `<!doctype html>
 <html lang="it">
@@ -6,54 +8,150 @@ export function renderCadPortalHtml(): string {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Posto CAD · Affitti XRPL</title>
   <style>
-    :root {
-      color-scheme: light;
-      --bg: #f3f6f5;
-      --surface: #fff;
-      --text: #132725;
-      --muted: #516661;
-      --line: #d9e4e0;
-      --primary: #076455;
-      --error: #8a332c;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
+    ${demoThemeTokens}
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
-    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
-    header { background: var(--surface); border-bottom: 1px solid var(--line); }
-    .topbar, main { max-width: 850px; margin-inline: auto; padding-inline: clamp(16px, 5vw, 32px); }
-    .topbar { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 8px; }
-    a { color: var(--primary); font-weight: 650; text-underline-offset: 3px; }
-    main { display: grid; gap: 20px; padding-block: clamp(24px, 7vw, 56px); }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: radial-gradient(ellipse 60rem 29rem at 68% 0%, #14243a, transparent 85%), var(--page);
+      color: var(--ink);
+      font: 1rem/1.55 var(--sans);
+    }
+    header { border-bottom: 1px solid var(--line); background: #0a1220; }
+    .topbar, main { width: min(100% - 3rem, 63rem); margin-inline: auto; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .55rem;
+      min-height: 4.45rem;
+      padding-block: .5rem;
+    }
+    .topbar a {
+      display: inline-flex;
+      align-items: center;
+      gap: .72rem;
+      color: var(--ink);
+      font-weight: 750;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .topbar a:hover { color: var(--accent-hover); }
+    .topbar a::before {
+      width: .86rem;
+      height: .86rem;
+      border: 1px solid var(--accent);
+      border-radius: .16rem;
+      background: linear-gradient(135deg, #14544a, #133b3c);
+      box-shadow: inset 0 0 0 2px #102b33, 0 0 1.2rem #72eac235;
+      content: "";
+      transform: rotate(45deg);
+    }
+    main { display: grid; gap: 1rem; padding-block: clamp(1.55rem, 5vw, 3.8rem); }
     h1, h2, p { margin: 0; }
-    h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.15; letter-spacing: -.04em; }
-    h2 { font-size: clamp(1.25rem, 4vw, 1.65rem); line-height: 1.3; }
-    .card { padding: clamp(18px, 5vw, 30px); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
-    .card p { margin-top: 6px; color: var(--muted); }
-    .actions:not([hidden]) { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    h1, h2 { line-height: 1.12; letter-spacing: -.035em; }
+    h1 {
+      position: relative;
+      z-index: 0;
+      isolation: isolate;
+      overflow: hidden;
+      padding: clamp(1.1rem, 3.5vw, 2.35rem);
+      border: 1px solid #345068;
+      border-radius: 1.12rem;
+      background: linear-gradient(116deg, #15243b, #101b2d 63%, #123139);
+      font-size: clamp(2rem, 5.4vw, 3.8rem);
+      font-weight: 735;
+      text-wrap: balance;
+    }
+    h1::before {
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      content: "";
+      background:
+        radial-gradient(circle at 89% 20%, #72eac237, transparent 40%),
+        repeating-linear-gradient(90deg, #a5dcca17 0 1px, transparent 1px 2.2rem),
+        repeating-linear-gradient(0deg, #a5dcca17 0 1px, transparent 1px 2.2rem);
+      mask-image: linear-gradient(90deg, transparent 6%, #000 84%);
+      pointer-events: none;
+    }
+    h2 { font-size: clamp(1.25rem, 3.6vw, 1.65rem); font-weight: 700; }
+    .card {
+      min-width: 0;
+      padding: clamp(1rem, 3.4vw, 1.55rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, #152338, #111b2a 75%);
+    }
+    .card p { margin-block-start: .5rem; color: var(--muted); }
+    .actions:not([hidden]) { display: flex; flex-wrap: wrap; gap: .65rem; margin-block-start: 1.1rem; }
+
     button, summary { font: inherit; }
     button {
-      min-height: 44px; padding: 8px 15px; border: 1px solid transparent; border-radius: 9px;
-      background: var(--primary); color: white; font-weight: 650; cursor: pointer;
+      min-height: 2.75rem;
+      padding: .58rem 1rem;
+      border: 1px solid transparent;
+      border-radius: .62rem;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 700;
+      line-height: 1.3;
+      cursor: pointer;
+      transition: background-color .17s ease, border-color .17s ease, color .17s ease;
     }
-    button:hover:not(:disabled) { background: #054d41; }
-    button:disabled { opacity: .65; cursor: wait; }
-    .secondary { background: var(--surface); border-color: var(--line); color: var(--primary); }
-    .secondary:hover:not(:disabled) { background: #eaf3f0; }
-    :is(a, button, summary):focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+    button:hover:not(:disabled) { background: var(--accent-hover); }
+    button:disabled { opacity: .55; cursor: wait; }
+    .secondary { border-color: var(--line); background: var(--surface-lift); color: var(--ink); }
+    .secondary:hover:not(:disabled) { background: #1a3340; color: var(--accent-hover); }
+    :focus-visible { outline: 2px solid var(--accent-hover); outline-offset: 4px; }
+
     .account { position: relative; }
-    summary { min-height: 44px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
-    summary span + span { margin-left: 5px; }
-    .address { color: var(--muted); font-size: .85rem; }
-    .switcher {
-      position: absolute; z-index: 1; right: 0; top: calc(100% + 6px); width: max-content; max-width: 80vw;
-      padding: 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
-      box-shadow: 0 8px 22px #13272514;
+    summary {
+      min-height: 2.75rem;
+      padding: .5rem .7rem;
+      border: 1px solid var(--line);
+      border-radius: .62rem;
+      background: var(--field);
+      cursor: pointer;
     }
-    .switcher button { width: 100%; text-align: left; border-color: transparent; }
-    .card p.error { color: var(--error); margin-top: 12px; }
-    #project-title { font-size: 1.15rem; }
-    svg { display: block; width: 100%; height: auto; margin-top: 16px; background: #09111e; border-radius: 10px; }
+    summary:hover, .account[open] > summary { border-color: #467b72; background: var(--tint); }
+    summary::marker { color: var(--accent); }
+    summary span + span { margin-inline-start: .35rem; }
+    .address { color: var(--muted); font: .76rem/1.4 var(--mono); overflow-wrap: anywhere; }
+    .switcher {
+      position: absolute;
+      z-index: 1;
+      inset: calc(100% + .4rem) 0 auto auto;
+      width: max-content;
+      max-width: 80vw;
+      padding: .35rem;
+      border: 1px solid #3a526e;
+      border-radius: .64rem;
+      background: var(--surface);
+      box-shadow: 0 .7rem 1.6rem #0008;
+    }
+    .switcher button { width: 100%; border-color: transparent; text-align: left; }
+    .card p.error { margin-block-start: .75rem; color: var(--error); }
+    #project-title { font-size: 1.17rem; }
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin-block-start: 1rem;
+      border: 1px solid #345068;
+      border-radius: .7rem;
+      background: #090f1c;
+    }
+
+    @media (max-width: 36rem) {
+      .topbar, main { width: min(100% - 1.8rem, 63rem); }
+      .topbar a { gap: .5rem; }
+      .address { font-size: .68rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      button { transition: none; }
+    }
   </style>
 </head>
 <body>

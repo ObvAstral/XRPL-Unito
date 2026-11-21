@@ -9,7 +9,7 @@ import { signLogin } from '../agreement/wallet-login.js'
 import { formatUtcSecond, type AccessDecisionView, type SampleOrderExchange } from '../shared/demo-contract.js'
 import { createDemoBillboardPng, validateAndDecodeImage } from './image-validator.js'
 import { createAppServer } from './server.js'
-import { RentalPlatformService, type LocalDemoRole, type OrderView } from './service.js'
+import { RentalPlatformService, type LocalDemoRole, type OrderView, type ResourceFundsView } from './service.js'
 import { SimulatedXrplNode, createSimulatedRuntime } from './xrpl-runtime.js'
 
 function createMinimalValidJpeg(): Buffer {
@@ -514,6 +514,19 @@ for (const combinedMintOffer of [false, true]) {
     const aliceAddr = h.runtime.setup.participants.alice
     const bobAddr = h.runtime.setup.participants.bob
     const authAddr = h.runtime.setup.participants.cadAuthority
+    const fundsPath = '/api/risorse/cad/fondi'
+    async function funds() {
+      const response = await h.api<ResourceFundsView>(fundsPath, { sessionRef: bobRef })
+      assert.equal(response.status, 200)
+      assert.ok(response.data.ledgerIndex > 0)
+      return response.data
+    }
+
+    assert.equal((await h.api(fundsPath)).status, 401)
+    const initialFunds = await funds()
+    assert.equal(initialFunds.accounts.alice?.balanceDrops, h.node.getBalanceDrops(aliceAddr).toString())
+    assert.equal(initialFunds.accounts.bob?.balanceDrops, h.node.getBalanceDrops(bobAddr).toString())
+    assert.equal(initialFunds.escrow.lockedDrops, '0')
 
     // Prima dell'affitto: Alice apre il progetto, Bob è escluso.
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: aliceRef })).status, 200)
@@ -552,6 +565,10 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(accepted.status, 200)
     assert.equal(accepted.data.status, 'pass_delivered_unfunded')
     assert.equal(h.node.getBalanceDrops(authAddr) - authBalBefore, 1_000_000n)
+    const afterFee = await funds()
+    assert.ok(afterFee.ledgerIndex > initialFunds.ledgerIndex)
+    assert.equal(afterFee.accounts.bob?.balanceDrops, h.node.getBalanceDrops(bobAddr).toString())
+    assert.equal(afterFee.escrow.lockedDrops, '0')
 
     // Manomissione diretta su SQLite senza deposito escrow sul ledger non abilita Bob.
     h.service.store.db
@@ -573,6 +590,12 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(deposited.data.status, 'confirmed')
     assert.ok(deposited.data.receipts.createHash)
     assert.ok(deposited.data.receipts.escrowObjectId)
+    const afterDeposit = await funds()
+    assert.equal(afterDeposit.escrow.state, 'locked')
+    assert.equal(afterDeposit.escrow.lockedDrops, '9000000')
+    assert.deepEqual(afterDeposit.accounts.vault, initialFunds.accounts.vault)
+    assert.equal(afterDeposit.accounts.bob?.balanceDrops, h.node.getBalanceDrops(bobAddr).toString())
+    assert.ok(BigInt(afterDeposit.accounts.bob!.spendableDrops) < BigInt(afterDeposit.accounts.bob!.balanceDrops))
 
     // Prima dell'inizio: Alice accede ancora, Bob riceve 409 CONFIRMED_BEFORE_START.
     assert.equal((await h.api('/api/cad/cad/progetto', { sessionRef: aliceRef })).status, 200)
@@ -627,6 +650,9 @@ for (const combinedMintOffer of [false, true]) {
     })
     assert.equal(rel.status, 200)
     assert.equal(rel.data.settlement.escrowState, 'credited_to_vault')
+    const afterRelease = await funds()
+    assert.deepEqual(afterRelease.escrow, { state: 'credited_to_vault', lockedDrops: '0', creditedDrops: '9000000' })
+    assert.equal(BigInt(afterRelease.accounts.vault!.balanceDrops) - BigInt(afterDeposit.accounts.vault!.balanceDrops), 9_000_000n)
 
     // Raccolta firme 2 su 3: 1 firma lascia in attesa di firma; 2 firme pagano tutti i 9 XRP ad Alice.
     const prep = await h.api<{ progress: { phase: string } }>(
@@ -660,6 +686,9 @@ for (const combinedMintOffer of [false, true]) {
     assert.equal(after2.data.order.vaultHeld, false)
     assert.equal(after2.data.order.receipts.payoutDeliveredDrops, '9000000')
     assert.equal(h.node.getBalanceDrops(aliceAddr) - aliceBalBeforePayout, 9_000_000n)
+    const afterPayout = await funds()
+    assert.deepEqual(afterPayout.payout, { beneficiary: 'alice', deliveredDrops: '9000000' })
+    assert.equal(BigInt(afterPayout.accounts.alice!.balanceDrops) - BigInt(afterRelease.accounts.alice!.balanceDrops), 9_000_000n)
 
     // Test arbitrato a favore di Bob su un secondo ordine: Ente + Bob firmano e 9 XRP tornano a Bob.
     const bobBalBeforeArb = h.node.getBalanceDrops(bobAddr)

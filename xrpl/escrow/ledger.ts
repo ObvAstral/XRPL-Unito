@@ -32,6 +32,7 @@ import type {
 import { normalizeTestnetNode, testnetWsUrl } from '../shared/testnet-node.js'
 import {
   AMENDMENTS_LEDGER_ENTRY_ID,
+  FEE_SETTINGS_LEDGER_ENTRY_ID,
   LSF_DISABLE_MASTER,
   NFTOKEN_MINT_OFFER_AMENDMENT_ID,
   RIPPLE_EPOCH_SECONDS,
@@ -70,6 +71,8 @@ export interface LedgerReserves {
   readonly reserveIncDrops: bigint
   readonly baseFeeDrops: bigint
 }
+
+type AccountReserves = Pick<LedgerReserves, 'reserveBaseDrops' | 'reserveIncDrops'>
 
 export type VaultInspectionState =
   | 'not_found'
@@ -262,6 +265,52 @@ export class EscrowLedger {
   }
 
   async accountBalanceDrops(account: string, snapshot: ValidatedLedger): Promise<bigint | null> {
+    const data = await this.accountDataAt(account, snapshot)
+    return data ? BigInt(data.Balance) : null
+  }
+
+  async accountReservesAt(snapshot: ValidatedLedger): Promise<AccountReserves> {
+    try {
+      const { result } = await this.client.request<
+        LedgerEntryRequest,
+        2,
+        LedgerEntryJsonResponse<LedgerEntry.FeeSettings>
+      >({
+        command: 'ledger_entry',
+        api_version: 2,
+        ledger_hash: snapshot.hash,
+        index: FEE_SETTINGS_LEDGER_ENTRY_ID,
+      })
+      const fees = result.node
+      const ledgerHash = 'ledger_hash' in result ? result.ledger_hash : undefined
+      if (result.validated !== true || typeof ledgerHash !== 'string' || ledgerHash.toUpperCase() !== snapshot.hash
+        || result.index !== FEE_SETTINGS_LEDGER_ENTRY_ID || fees?.LedgerEntryType !== 'FeeSettings') {
+        throw new LedgerUnavailable()
+      }
+      const base = 'ReserveBaseDrops' in fees ? fees.ReserveBaseDrops : fees.ReserveBase
+      const increment = 'ReserveIncrementDrops' in fees ? fees.ReserveIncrementDrops : fees.ReserveIncrement
+      if (!/^\d+$/.test(String(base)) || !/^\d+$/.test(String(increment))) throw new LedgerUnavailable()
+      return { reserveBaseDrops: BigInt(base), reserveIncDrops: BigInt(increment) }
+    } catch {
+      throw new LedgerUnavailable()
+    }
+  }
+
+  async accountFundsAt(account: string, snapshot: ValidatedLedger, reserves: AccountReserves) {
+    const data = await this.accountDataAt(account, snapshot)
+    if (!data) return null
+    if (!Number.isSafeInteger(data.OwnerCount) || data.OwnerCount < 0) {
+      throw new LedgerUnavailable()
+    }
+    const balance = BigInt(data.Balance)
+    const reserve = reserves.reserveBaseDrops + BigInt(data.OwnerCount) * reserves.reserveIncDrops
+    return {
+      balanceDrops: balance.toString(),
+      spendableDrops: (balance > reserve ? balance - reserve : 0n).toString(),
+    }
+  }
+
+  private async accountDataAt(account: string, snapshot: ValidatedLedger) {
     try {
       const { result } = await this.client.request<AccountInfoRequest, 2, AccountInfoResponse>({
         command: 'account_info',
@@ -269,10 +318,14 @@ export class EscrowLedger {
         account,
         ledger_hash: snapshot.hash,
       })
-      if (result.validated !== true || result.account_data?.Account !== account) {
+      const ledgerHash = 'ledger_hash' in result ? result.ledger_hash : undefined
+      if (result.validated !== true || result.account_data?.Account !== account ||
+        !/^\d+$/.test(result.account_data.Balance) ||
+        (ledgerHash !== undefined && (typeof ledgerHash !== 'string' || ledgerHash.toUpperCase() !== snapshot.hash)) ||
+        (result.ledger_index !== undefined && result.ledger_index !== snapshot.index)) {
         throw new LedgerUnavailable()
       }
-      return BigInt(result.account_data.Balance)
+      return result.account_data
     } catch (error) {
       if (rippleError(error).error === 'actNotFound') return null
       if (error instanceof LedgerUnavailable) throw error

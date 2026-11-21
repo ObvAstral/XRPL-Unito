@@ -247,6 +247,12 @@ export function createAppServer(service: RentalPlatformService): {
         sendJson(res, 200, service.listResources())
         return
       }
+      const fundsMatch = /^\/api\/risorse\/([^/]+)\/fondi$/.exec(pathname)
+      if (method === 'GET' && fundsMatch?.[1]) {
+        const funds = await service.getResourceFunds(getSessionRefFromRequest(req), decodeURIComponent(fundsMatch[1]))
+        sendJson(res, 200, funds)
+        return
+      }
       const accessMatch = /^\/api\/risorse\/([^/]+)\/accesso$/.exec(pathname)
       if (method === 'GET' && accessMatch?.[1]) {
         const resourceId = decodeURIComponent(accessMatch[1])

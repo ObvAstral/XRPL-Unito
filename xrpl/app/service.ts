@@ -15,6 +15,7 @@ import {
 } from '../agreement/rental.js'
 import { WalletLogin, signLogin, type LoginChallenge } from '../agreement/wallet-login.js'
 import { verifyWalletSignature, type LocalSigner } from '../agreement/wallet.js'
+import { LedgerUnavailable, type OrderEscrowStatus, type ValidatedLedger } from '../escrow/ledger.js'
 import { splitRentalAmount } from '../escrow/protocol.js'
 import type { VaultPayoutProgress } from '../escrow/service.js'
 import { rippleTime } from '../nft/pass.js'
@@ -152,6 +153,23 @@ export interface BillboardCurrentView {
   readonly expiresAtUtc: string | null
   readonly expiresAtTorino: string | null
   readonly serverNowUtc: string
+}
+
+interface AccountFundsView {
+  readonly balanceDrops: string
+  readonly spendableDrops: string
+}
+
+export interface ResourceFundsView {
+  readonly resourceId: string
+  readonly ledgerIndex: number
+  readonly accounts: Readonly<Record<'alice' | 'bob' | 'vault', AccountFundsView | null>>
+  readonly escrow: {
+    readonly state: OrderEscrowStatus['state'] | 'not_created' | 'unavailable'
+    readonly lockedDrops: string | null
+    readonly creditedDrops?: string
+  }
+  readonly payout: { readonly beneficiary: 'alice' | 'bob'; readonly deliveredDrops: string } | null
 }
 
 export class RentalPlatformService {
@@ -554,6 +572,76 @@ export class RentalPlatformService {
 
   listResources(): CatalogResourceConfig[] {
     return this.store.listResources()
+  }
+
+  async getResourceFunds(sessionRef: string | null, resourceId: string): Promise<ResourceFundsView> {
+    const session = this.getSessionView(sessionRef)
+    if (!session.authenticated || !session.address) {
+      throw new HttpError(401, 'SESSION_REQUIRED', 'Collega il wallet per vedere i saldi.')
+    }
+    const resource = this.requireResource(resourceId)
+    const bobAddress = this.runtime.setup.participants.bob
+    if (![resource.alice, bobAddress, resource.issuer].includes(session.address)) {
+      throw new HttpError(403, 'FORBIDDEN_FUNDS', 'Il wallet collegato non è un partecipante per questa risorsa.')
+    }
+
+    const orders = this.store.listOrders(resource.resourceId)
+    const order = orders.find((item) => item.vaultHeld === 1) ?? orders[0]
+    const ledger = this.runtime.escrowLedger
+    try {
+      const snapshot = await ledger.snapshot()
+      const reserves = await ledger.accountReservesAt(snapshot)
+      const [alice, bob, vault, escrow] = await Promise.all([
+        ledger.accountFundsAt(resource.alice, snapshot, reserves),
+        ledger.accountFundsAt(bobAddress, snapshot, reserves),
+        ledger.accountFundsAt(resource.vault, snapshot, reserves),
+        this.readEscrowFunds(order, resource, snapshot),
+      ])
+      const payout =
+        order?.payoutLedgerIndex && order.payoutLedgerIndex <= snapshot.index && order.payoutDeliveredDrops &&
+        (order.payoutBeneficiary === resource.alice || order.payoutBeneficiary === bobAddress)
+          ? {
+              beneficiary: order.payoutBeneficiary === bobAddress ? 'bob' as const : 'alice' as const,
+              deliveredDrops: order.payoutDeliveredDrops,
+            }
+          : null
+      return { resourceId: resource.resourceId, ledgerIndex: snapshot.index, accounts: { alice, bob, vault }, escrow, payout }
+    } catch (error) {
+      if (error instanceof LedgerUnavailable) {
+        throw new HttpError(503, 'LEDGER_UNAVAILABLE', 'Saldi temporaneamente indisponibili.')
+      }
+      throw error
+    }
+  }
+
+  private async readEscrowFunds(
+    order: OrderRecord | undefined, resource: CatalogResourceConfig, snapshot: ValidatedLedger,
+  ): Promise<ResourceFundsView['escrow']> {
+    if (!order?.createHash) return { state: 'not_created', lockedDrops: '0' }
+    const rentalResource = toRentalResource(resource)
+    let rental: ReturnType<typeof verifyRental>
+    try {
+      rental = verifyRental(JSON.parse(order.bundleJson), rentalResource)
+    } catch {
+      return { state: 'mismatch', lockedDrops: null }
+    }
+    const paymentOrder = toPaymentOrder(rental, resource.scenario)
+    try {
+      const escrow = await this.runtime.escrowLedger.verifyEscrowAt(
+        { ...paymentOrder, createHash: order.createHash },
+        snapshot,
+      )
+      if (escrow.state === 'locked' || escrow.state === 'releasable') {
+        return { state: escrow.state, lockedDrops: escrow.deposit.amountDrops }
+      }
+      if (escrow.state === 'credited_to_vault') {
+        return { state: escrow.state, lockedDrops: '0', creditedDrops: escrow.deposit.amountDrops }
+      }
+      return { state: escrow.state, lockedDrops: null }
+    } catch (error) {
+      if (error instanceof LedgerUnavailable) return { state: 'unavailable', lockedDrops: null }
+      throw error
+    }
   }
 
   listListings() {
@@ -1562,7 +1650,7 @@ export class RentalPlatformService {
           snap,
         )
         escrowState = esc.state
-        if (esc.state === 'locked') escrowLabel = '9 XRP bloccati nell’escrow'
+        if (esc.state === 'locked') escrowLabel = 'Deposito bloccato nell’escrow'
         else if (esc.state === 'releasable') escrowLabel = 'Sbloccabile (EscrowFinish pronto)'
         else if (esc.state === 'credited_to_vault') escrowLabel = 'Accreditato al vault'
         else if (esc.state === 'pending') escrowLabel = 'In attesa del ledger'
@@ -1621,7 +1709,7 @@ export class RentalPlatformService {
       approved_offer_ready: {
         label: 'Pass emesso · offerta pronta per Bob',
         nextSigner: 'Bob',
-        nextAction: 'Bob accetta l’offerta del pass e paga la fee di 1 XRP all’ente',
+        nextAction: 'Bob accetta l’offerta del pass e paga la commissione all’ente',
       },
       pass_delivered_unfunded: {
         label: 'Pass consegnato · deposito mancante',
