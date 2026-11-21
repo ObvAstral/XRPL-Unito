@@ -1,17 +1,35 @@
 # XRPL UniTo · Renting temporary usage rights
 
-Alice holds an annual CAD license, but her seat will sit idle in August. She can list that month on the marketplace, set a price, and rent the seat to Bob with the software provider’s approval. Alice keeps the NFT that represents her license. Bob receives a separate NFT pass that lets him use the seat for the agreed period.
+A rights holder can rent out the use of a resource for a fixed period while keeping the underlying title. The prototype uses the **XRP Ledger (XRPL)** to record who holds the title and the rental pass, lock the rent until expiry, and settle the payment. The service that controls the resource enforces access using those ledger records and the dates in the signed agreement.
 
-The prototype uses the **XRP Ledger (XRPL)** to record ownership, issue rental passes, and settle payments in XRP. The service that controls the resource checks Bob’s pass, his deposit, and the rental dates before granting access. His access ends when the rental expires, even if Alice’s payout is still pending.
+## How a rental works
+
+### The title, the rental pass, and the oracle
+
+The resource authority issues a **title NFT** that identifies the holder’s underlying right. It stays in the holder’s wallet throughout the rental. To rent out a time slot, the holder signs a listing with the title ID, dates, price, and authority fee. The renter signs an order that references the listing by its hash. Both signatures are made off-chain.
+
+The authority acts as the **oracle** for that resource. It decides whether to authorize the rental under its own rules. To approve, it signs an `NFTokenMint` transaction and offers a separate **rental pass NFT** to the renter’s wallet. The pass has an immutable URI containing the SHA-256 hash of the order. Because the order also contains the listing hash, the service can verify exactly which parties, resource, dates, and price the authority approved. The renter cannot transfer the pass to another user.
+
+### Funding the rental and granting access
+
+The renter makes two transactions. First, `NFTokenAcceptOffer` delivers the pass and pays the authority’s fee in a single transaction. Then `EscrowCreate` locks the rest of the rent in XRP, with the resource’s shared account (the *vault*) as the destination and `FinishAfter` set to the rental end time. For a **10 XRP** rental with a **10%** fee, the authority receives **1 XRP** and **9 XRP** enter escrow.
+
+When the renter requests access, the service checks the authenticated wallet and the rental dates. It verifies the holder’s title, the renter’s exact pass and its issuer, and the order’s escrow deposit against the same validated ledger snapshot. During the agreed interval, the funded pass gives the renter exclusive use. At expiry the service ends access, even if the pass is still in the wallet and the payout is still pending.
+
+### Releasing escrow and settling with two signatures
+
+Once the ledger time has passed `FinishAfter`, the operator submits `EscrowFinish` to move the locked XRP into the vault. This transaction has a fixed destination. Choosing who receives the funds from the vault happens in a separate `Payment`.
+
+The vault has three signers (the holder, the renter, and the oracle), a **2-of-3** quorum, and a disabled master key. Two signers must authorize the same payment, including its amount and destination. In a routine settlement, the holder and renter can sign together to pay the holder. In a dispute, the application lets the oracle co-sign with the holder to release the rent to them, or with the renter to return it. The oracle’s signature alone can approve a rental pass, but moving money out of the vault always takes a second signer.
 
 ## Use cases
+
+In both demos, Alice holds the title and Bob rents a time slot. Each resource has its own authority and vault.
 
 | Resource | Who approves the rental? | What happens during and after the rental? |
 | --- | --- | --- |
 | **CAD seat** | The software provider | Bob can open the demo project while the seat is reserved for him. At the end of the rental, the portal closes his project. Alice can open it again if her license is still valid and the seat is available. |
 | **Digital billboard** | The Municipality of Turin, simulated in the demo | Alice holds the right to use the `torino-01` display. Bob rents a time slot and can publish an image during that slot. The screen stays blank until he publishes and goes blank again when the slot ends. |
-
-Both rentals follow the same payment flow. Alice signs the listing, Bob signs the order, and the approving authority issues the pass. In the **10 XRP** demo, Bob pays the authority **1 XRP** when he accepts the pass and locks the remaining **9 XRP** in escrow until the rental ends. The funds can then be released to the resource’s *vault*, an account controlled by Alice, Bob, and the authority. In a routine settlement, Alice and Bob sign the payment that sends the 9 XRP to Alice.
 
 ## Build and run the demo
 
