@@ -31,16 +31,19 @@ In both demos, Alice holds the title and Bob rents a time slot. Each resource ha
 | **CAD seat** | The software provider | Bob can open the demo project while the seat is reserved for him. At the end of the rental, the portal closes his project. Alice can open it again if her license is still valid and the seat is available. |
 | **Digital billboard** | The Municipality of Turin, simulated in the demo | Alice holds the right to use the `torino-01` display. Bob rents a time slot and can publish an image during that slot. The screen stays blank until he publishes and goes blank again when the slot ends. |
 
-## Build and run the demo
+## Build and run the demo on XRPL Testnet
 
-You need **Node.js 22.13.0 or later** and **npm**. Run these commands from the repository root.
+The website runs on your computer and submits transactions to the public XRPL Testnet. You need **Node.js 22.13.0 or later**, **npm**, and network access to the Testnet and its faucet. Run these commands from the repository root.
 
 ```sh
 npm --prefix xrpl ci
-npm --prefix xrpl start
+npm --prefix xrpl run setup:wallets
+XRPL_MODE=testnet npm --prefix xrpl start
 ```
 
-The `start` script compiles the TypeScript source into `xrpl/dist/` and starts the server in **local simulation mode**. The app creates demo wallets and stores its state in SQLite. You can try both scenarios without setting up a wallet or connecting to the Testnet.
+On the first run, `setup:wallets` prepares the funded development wallets and two **2-of-3 multisignature vaults**, one for the CAD seat and one for the billboard. It saves the wallet keys and configuration in `xrpl/.xrpl-local/`, which Git ignores. For later runs with the same setup, repeat the last command. The `start` script compiles the TypeScript source into `xrpl/dist/` before starting the server.
+
+Open the marketplace and check that it shows **XRPL Testnet**. Choose **Alice** to publish a listing, switch to **Bob** to accept it, then approve it as the resource authority. Switch back to Bob to accept the pass and fund the escrow. When the rental period begins, Bob can open the CAD project or publish an image to the billboard, depending on the resource.
 
 | Page | Local address |
 | --- | --- |
@@ -49,6 +52,17 @@ The `start` script compiles the TypeScript source into `xrpl/dist/` and starts t
 | Public billboard display — view the image currently on screen | [http://127.0.0.1:3000/schermo/torino-01](http://127.0.0.1:3000/schermo/torino-01) |
 
 Press `Ctrl+C` to stop the server. To compile the project on its own, run `npm --prefix xrpl run build`. To compile and run the automated tests, use `npm --prefix xrpl test`.
+
+## Run the demo in local simulation mode (optional)
+
+You can also try both scenarios with simulated wallets, payments, and a clock you can advance. Stop any running demo with `Ctrl+C`, then run the following from the repository root. If you already installed the dependencies, skip the first command.
+
+```sh
+npm --prefix xrpl ci
+npm --prefix xrpl start
+```
+
+Open the same marketplace address and check that it shows **Simulation**. This mode creates its own demo wallets and keeps its data separate from the Testnet session.
 
 ### Watch a CAD rental expire
 
@@ -59,14 +73,3 @@ Press `Ctrl+C` to stop the server. To compile the project on its own, run `npm -
 ### Publish an image on the billboard
 
 Choose **Advertising Billboard** in the marketplace. Publish a listing as **Alice**, accept it as **Bob**, and approve the rental as **Municipality of Turin**. Switch back to Bob to accept the pass and fund the escrow. Once the rental starts, click **Use a sample image** and open the public billboard display to see the image on `torino-01`.
-
-### Run on the XRPL Testnet (optional)
-
-To try the payment flow on the public test network, you need access to the Testnet and its faucet. After installing the dependencies, stop the local server if it is running and run these commands from the repository root.
-
-```sh
-npm --prefix xrpl run setup:wallets
-XRPL_MODE=testnet npm --prefix xrpl start
-```
-
-The first command sets up development wallets and two **2-of-3 multisignature vaults**, one for the CAD seat and one for the billboard. The second starts the same three pages backed by the Testnet. The app stores development keys and local data in `xrpl/.xrpl-local/`, which Git ignores.
