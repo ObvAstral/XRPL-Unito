@@ -100,3 +100,33 @@ comando con gli stessi termini e lo stesso registro per riconciliare l’hash.
   invii e confermato l’assenza del deposito. Una revoca validata con
   `feeRefundDue: true` segnala un pass revocato dal wallet di Bob. Per il
   rimborso, la Persona B usa anche la ricevuta validata della fee pagata.
+
+## 3. Applicazione Web, Backend SQLite e Demo (Persona C)
+
+Avvio del server unificato (marketplace, controllo accesso, portale CAD e player cartellone) in modalità simulazione locale immediata:
+
+```sh
+npm --prefix xrpl start
+```
+
+Per collegarsi alla Testnet XRPL reale dopo `npm --prefix xrpl run setup:wallets`:
+
+```sh
+XRPL_MODE=testnet npm --prefix xrpl start
+```
+
+### Superfici web servite
+
+- `GET /` — Marketplace, login wallet firmato, barra dei preset simulati (`pending_authority`, `pass_delivered_missing_deposit`, `active_rental`, `expired_rental`, `expired_rental_and_license`), pannelli Alice, Bob ed Ente, ricevute XRPL e firme multifirma 2-su-3.
+- `GET /cad` — Portale CAD dimostrativo con pulsante **Apri progetto demo**, testi per Alice e Bob in fuso `Europe/Rome`, polling ogni 2 secondi e chiusura automatica alla scadenza.
+- `GET /schermo/torino-01` — Player a pieno schermo del cartellone digitale: bianco prima della pubblicazione e alla scadenza, immagine `object-fit: cover` durante il periodo autorizzato.
+
+### API principali (convenzioni v2)
+
+- `POST /api/wallet/challenge`, `POST /api/wallet/session`, `GET /api/wallet/session`, `DELETE /api/wallet/session`
+- `GET /api/risorse`, `GET /api/risorse/{id}/accesso`, `GET /api/scambio/esempio-cad`
+- `GET /api/annunci`, `POST /api/annunci`, `POST /api/annunci/{id}/ordini`
+- `GET /api/ordini`, `GET /api/ordini/{id}`, `POST /api/ordini/{id}/decisione`, `POST /api/ordini/{id}/pass/accetta`, `POST /api/ordini/{id}/deposito`, `POST /api/ordini/{id}/sblocco`, `POST /api/ordini/{id}/liquidazione`, `POST /api/ordini/{id}/recupero`, `POST /api/ordini/{id}/riconcilia`
+- `GET /api/cad/{id}/progetto`
+- `POST /api/cartelloni/{id}/immagine`, `GET /api/cartelloni/{id}/corrente`, `GET /api/cartelloni/{id}/immagine-file`
+- `GET /api/simulazione/stato`, `POST /api/simulazione/preset`, `POST /api/simulazione/tempo`

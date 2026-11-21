@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "setup:wallets": "npm run build && node dist/setup-wallets.js",
+    "start": "npm run build && node dist/app/server.js",
     "test": "npm run build && node --test dist/*/*.test.js"
   },
   "dependencies": {
